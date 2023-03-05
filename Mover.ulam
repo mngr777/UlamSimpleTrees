@@ -1,0 +1,21 @@
+/**
+   \color #0ff
+ */
+element Mover: QBondableT(1u) {
+  typedef C2D.Dir Dir;
+
+  Dir mDir = 6u; // west
+
+  Void setDir(C2D.Dir dir) {
+    mDir = dir;
+  }
+
+  Void behave() {
+    C2D coord;
+    coord = coord.neighbor(mDir);
+
+    EventWindow ew;
+    SwapHelper sh;
+    sh.swap(0u, ew.getSiteNumber(coord));
+  }
+}

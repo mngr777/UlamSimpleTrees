@@ -1,0 +1,122 @@
+// NOTE:
+// - mSite stores a raw site number ot other end of the bond,
+//   but function arguments are site numbers under current symmetry
+quark QBond : Fail {
+  typedef EventWindow.SiteNum SiteNum;
+  typedef Unsigned(6) Site;
+  typedef Unsigned(3) Index;
+
+  constant Unsigned(3) cMAX_DIST = 4u;
+
+  Site mSite = 0u;
+  Index mIndex;
+
+  Bool isBonded() {
+    return mSite != 0u;
+  }
+
+  Bool createBond(Index index, SiteNum siteOther, Index indexOther) {
+    return createBond(0u, index, siteOther, indexOther);
+  }
+
+  Bool createBond(SiteNum site, Index index, SiteNum siteOther, Index indexOther) {
+    if (isBonded())
+      return false;
+
+    EventWindow ew;
+    Atom& bondable = ew.aref(siteOther);
+    if (bondable as IBondable) {
+      C2D coord = ew.getCoord(site);
+      C2D coordOther = ew.getCoord(siteOther);
+      QBond& bonded = bondable.getBond(indexOther);
+      mSite = (Site) ew.getSiteNumberRaw(coordOther - coord);
+      mIndex = indexOther;
+      bonded.mSite = (Site) ew.getSiteNumberRaw(coord - coordOther);
+      bonded.mIndex = index;
+
+      return true;
+
+    } else {
+      DebugUtils du;
+      du.print("QBond.createBond: the other atom is not bondable");
+    }
+    return false;
+  }
+
+  Void destroyBond() {
+    destroyBond(0u);
+  }
+
+  Void destroyBond(SiteNum site) {
+    if (!isBonded())
+      return;
+
+    EventWindow ew;
+    C2D coord = ew.getCoord(site);
+    C2D coordBonded = coord + ew.getCoordRaw(mSite);
+    Atom& bondable = ew[coordBonded];
+    if (bondable as IBondable) {
+      QBond& bonded = bondable.getBond(mIndex);
+      mSite = 0u;
+      bonded.mSite = 0u;
+
+    } else {
+      DebugUtils du;
+      du.print("QBond.destroyBond: other of the bond is not boundable");
+    }
+  }
+
+  Bool checkForSwap(SiteNum siteOther) {
+    return checkForSwap(0u, siteOther);
+  }
+
+  Bool checkForSwap(SiteNum site, SiteNum siteOther) {
+    if (!isBonded())
+      return true;
+
+    EventWindow ew;
+    C2D coord = ew.getCoord(site);
+    C2D coordBonded = coord + ew.getCoordRaw(mSite);
+    C2D coordOther = ew.getCoord(siteOther);
+    if (!ew.isAccessible(coordBonded)) {
+      // The normal reason for this is that the atom owning this bond is not at
+      // the event window origin
+      return false;
+    }
+    return coordBonded.manhattanDistance(coordOther) <= cMAX_DIST;
+  }
+
+  Void updateForSwap(SiteNum siteOther) {
+    updateForSwap(0u, siteOther);
+  }
+
+  Void updateForSwap(SiteNum site, SiteNum siteOther) {
+    if (!isBonded())
+      return;
+
+    EventWindow ew;
+
+    C2D coord = ew.getCoord(site);
+    C2D coordBonded = coord + ew.getCoordRaw(mSite);
+    C2D coordOther = ew.getCoord(siteOther);
+    if (coordBonded.manhattanDistance(coordOther) > cMAX_DIST)
+      fail("QBond.updateForSwap: distance exceeds the limit");
+
+    Atom& bondable = ew[coordBonded];
+    if (bondable as IBondable) {
+      QBond& bonded = bondable.getBond(mIndex);
+
+      if (coordBonded != coordOther) {
+        mSite = (Site) ew.getSiteNumberRaw(coordBonded - coordOther);
+        bonded.mSite = (Site) ew.getSiteNumberRaw(coordOther - coordBonded);
+      } else {
+        // Swapping bond ends, update only this one
+        mSite = (Site) ew.getSiteNumberRaw(coord - coordOther);
+      }
+
+    } else {
+      DebugUtils du;
+      du.print("QBond.updateForSwap: other of the bond is not boundable");
+    }
+  }
+}

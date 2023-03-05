@@ -1,0 +1,6 @@
+quark IDiffusable {
+  typedef Unsigned(14) Diffusability;
+
+  virtual Diffusability getDiffusability();
+  virtual WindowServices.Radius getDiffusionRadius();
+}

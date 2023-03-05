@@ -1,0 +1,16 @@
+// TODO: check for invalid bonds
+quark IBondable {
+  typedef EventWindow.SiteNum SiteNum;
+
+  virtual QBond& getBond(QBond.Index index);
+  virtual Bool checkBondsForSwap(SiteNum site, SiteNum siteOther);
+  virtual Void updateBondsForSwap(SiteNum site, SiteNum siteOther);
+
+  Bool checkBondsForSwap(SiteNum siteOther) {
+    return checkBondsForSwap(0u, siteOther);
+  }
+
+  Void updateBondsForSwap(SiteNum siteOther) {
+    updateBondsForSwap(0u, siteOther);
+  }
+}
