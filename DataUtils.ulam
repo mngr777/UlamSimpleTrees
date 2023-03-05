@@ -1,0 +1,16 @@
+quark DataUtils {
+  typedef Bits(16) Datum;
+  typedef Bits(8) Byte;
+
+  Datum makeDatum(Byte hi, Byte lo) {
+    return (Datum)((Datum) hi << 8 | lo);
+  }
+
+  Byte getHi(Datum datum) {
+    return (Byte) (datum >> 8);
+  }
+
+  Byte getLo(Datum datum) {
+    return (Byte) datum;
+  }
+}

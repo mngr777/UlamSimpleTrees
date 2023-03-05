@@ -1,0 +1,75 @@
+local typedef EventWindow.SiteNum SiteNum;
+
+element Tree: QBondableT(3u) + QDiffusableT(10000u, 2u) {
+  typedef DataUtils.Datum Datum;
+
+  constant QBond.Index cPARENT = 0u;
+  constant QBond.Index cRIGHT = 1u;
+  constant QBond.Index cLEFT = 2u;
+
+  Datum mData;
+
+  Void setData(Datum data) {
+    mData = data;
+  }
+
+  Bool isRoot() {
+    return !getBond(cPARENT).isBonded();
+  }
+
+  // TEST
+
+  Bool mGrowFlag = false;
+  Unsigned(3) mLevel = 0u;
+
+  Void setGrowFlag() {
+    if (mLevel >= 3u)
+      return;
+    mGrowFlag = true;
+  }
+
+  Void behave() {
+    if (mGrowFlag) {
+      if (!hasChild(cLEFT))
+        addChild(cLEFT);
+      if (!hasChild(cRIGHT))
+        addChild(cRIGHT);
+      if (hasChild(cLEFT) && hasChild(cRIGHT))
+        mGrowFlag = false;
+    }
+    diffuse();
+  }
+
+  Bool hasChild(QBond.Index index) {
+    return getBond(index).isBonded();
+  }
+
+  Bool addChild(QBond.Index index) {
+    if (hasChild(index))
+      return false;
+
+    WindowServices ws;
+    ws.reset(1u, QBond.cMAX_DIST);
+    ws.scan(WindowServices.cEMPTY_SITES_HIT);
+    if (ws.getHits() == 0u)
+      return false;
+    SiteNum site = ws.getPick();
+
+    EventWindow ew;
+    Tree child;
+    child.mLevel = (Unsigned(3)) (mLevel + 1u);
+    child.setGrowFlag();
+    ew[site] = child;
+    getBond(index).createBond(index, site, cPARENT);
+    return true;
+  }
+
+  // UrSelf
+  @Override virtual ARGB getColor(Unsigned selector) {
+    ColorUtils cu;
+    Bits hex = 0x0000ff00;
+    if (isRoot())
+      hex = 0x00ff0000;
+    return cu.color(hex);
+  }
+}

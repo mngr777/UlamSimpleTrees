@@ -1,0 +1,30 @@
+quark SwapHelper {
+  typedef EventWindow.SiteNum SiteNum;
+
+  Bool swap(SiteNum site1, SiteNum site2) {
+    EventWindow ew;
+
+    Atom& atom1 = ew[site1];
+    Atom& atom2 = ew[site2];
+
+    // Check if bonds allow for swapping
+    if (atom1 as IBondable) {
+      if (!atom1.checkBondsForSwap(site1, site2))
+        return false;
+    }
+    if (atom2 as IBondable) {
+      if (!atom2.checkBondsForSwap(site2, site1))
+        return false;
+    }
+
+    // Update bonds
+    if (atom1 as IBondable)
+      atom1.updateBondsForSwap(site1, site2);
+    if (atom2 as IBondable)
+      atom2.updateBondsForSwap(site2, site1);
+
+    // Swap
+    ew.swap(site1, site2);
+    return true;
+  }
+}

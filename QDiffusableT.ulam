@@ -1,0 +1,59 @@
+quark IDiffusable {
+  typedef Unsigned(14) Diffusability;
+
+  virtual Diffusability getDiffusability();
+  virtual WindowServices.Radius getDiffusionRadius();
+}
+
+
+local typedef EventWindow.SiteNum SiteNum;
+
+quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radius cDIFFUSION_RADIUS): IDiffusable {
+
+  constant Diffusability cCOMPLETE_DIFFUSABILITY = 10000u;
+
+  @Override virtual Diffusability getDiffusability() {
+    return cDIFFUSABILITY;
+  }
+
+  @Override virtual WindowServices.Radius getDiffusionRadius() {
+    return cDIFFUSION_RADIUS;
+  }
+
+  // NOTE: should only be called on an atom at the event window origin
+  Void diffuse() {
+    if (getDiffusability() == 0u || getDiffusionRadius() == 0u)
+      return;
+
+    // Get random site
+    WindowServices ws;
+    ws.reset(1u, getDiffusionRadius());
+    ws.scan(WindowServices.cALL_SITES_HIT);
+    if (ws.getHits() == 0u)
+      return;
+    SiteNum site = ws.getPick();
+
+    // Swap with some probability
+    EventWindow ew;
+    Random random;
+    Diffusability d = 0u;
+    if (ew.isEmpty(site)) {
+      d = getDiffusability();
+    } else {
+      Atom& other = ew[site];
+      if (other as IDiffusable) {
+        if (other.getDiffusability() > 0u
+            && other.getDiffusionRadius() == ew.getCoord(site).length())
+        {
+          Diffusability d1 = getDiffusability();
+          Diffusability d2 = other.getDiffusability();
+          d = (d1 < d2) ? d1 : d2;
+        }
+      }
+    }
+    if (d > 0u && random.oddsOf(d, cCOMPLETE_DIFFUSABILITY)) {
+      SwapHelper sh;
+      sh.swap(0, site);
+    }
+  }
+}

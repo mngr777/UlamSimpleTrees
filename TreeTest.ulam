@@ -1,0 +1,47 @@
+local typedef EventWindow.SiteNum SiteNum;
+
+/**
+   \color #00f
+ */
+element Mover: QBondableT(1u) {
+  typedef C2D.Dir Dir;
+
+  Dir mDir = 6u; // west
+
+  Void setDir(C2D.Dir dir) {
+    mDir = dir;
+  }
+
+  Void behave() {
+    C2D coord;
+    coord = coord.neighbor(mDir);
+
+    EventWindow ew;
+    SwapHelper sh;
+    sh.swap(0u, ew.getSiteNumber(coord));
+  }
+}
+
+
+/**
+   \color #00f
+ */
+element TreeTest {
+  Void behave() {
+    EventWindow ew;
+    if (ew.isEmpty(1)) {
+      Tree tree;
+      tree.setGrowFlag();
+      ew[1] = tree;
+
+      Mover mover;
+      ew[9] = mover;
+      IBondable& bondable = (IBondable&) ew[9];
+      bondable.getBond(0u).createBond(9, 0u, 1, Tree.cPARENT);
+
+      // Our work is done
+      Empty empty;
+      ew[0] = empty;
+    }
+  }
+}
