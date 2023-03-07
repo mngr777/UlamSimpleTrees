@@ -1,0 +1,94 @@
+local typedef DataUtils.Datum Datum;
+
+/**
+   \symbol TS
+   \color #00f
+   \symmetry all
+ */
+element TreeSequenceTest : QBondableT(1u) + QMortal {
+  typedef TreeData.Arity Arity;
+
+  constant Unsigned cLENGTH = 7;
+
+  //    (2)
+  //   /   \
+  // (1)   (2)
+  //  |    / \
+  // (0) (0) (1)
+  //          |
+  //         (0)
+  //
+  Arity mArities[cLENGTH] = {2, 1, 0, 2, 0, 1, 0};
+  Unsigned mCounter = 0;
+
+  @Override Void behave() {
+    if (mCounter < cLENGTH) {
+      if (buildNextItem())
+        mCounter++;
+    } else if (mCounter == cLENGTH) {
+      if (buildTreeBuilder())
+        die(); // done
+    }
+  }
+
+  Bool buildNextItem() {
+    DebugUtils du;
+    EventWindow ew;
+
+    QBond& bond = getBond(0);
+
+    // Find an empty site
+    SiteNum siteNext = findEmptySite();
+    if (siteNext == SiteNum.maxof)
+      return false;
+
+    // Build next item
+    Sequence next;
+    next.setData(makeDatum(mArities[mCounter]));
+    ew[siteNext] = next;
+
+    // Bond to previous item
+    if (bond.isBonded()) {
+      SiteNum sitePrev = bond.getSiteNumber();
+      Sequence& prev = (Sequence&) ew[sitePrev];
+      if (!prev.getBond(Sequence.cNEXT).bond(sitePrev, Sequence.cNEXT, siteNext, Sequence.cPREV)) {
+        // for this test just assume the items were too far apart,
+        // cleanup and retry later
+        Empty empty;
+        ew[siteNext] = empty;
+        return false;
+      }
+
+      // detach from previous item
+      bond.breakup();
+    }
+
+    // Attach to next item
+    if (!bond.bond(0, siteNext, Sequence.cCOMMON)) {
+      du.print("Failed to attach to next item");
+      return false;
+    }
+    return true;
+  }
+
+  Bool buildTreeBuilder() {
+    getBond(0).breakup();
+    return true;
+  }
+
+  SiteNum findEmptySite() {
+    WindowServices ws;
+    ws.reset(1u, 4u);
+    ws.scan(WindowServices.cEMPTY_SITES_HIT);
+    if (ws.getHits() == 0)
+      return SiteNum.maxof;
+    return ws.getPick();
+  }
+
+  Datum makeDatum(Arity arity) {
+    TreeData td;
+    Datum datum = 0x0;
+    datum = td.setArity(datum, arity);
+    return datum;
+  }
+}

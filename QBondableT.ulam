@@ -21,7 +21,6 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
       getBond(i).updateForSwap(site, siteOther);
   }
 
-  // UrSelf::renderGraphics()
   @Override Void renderGraphics() {
     Drawable drawable;
     if (!drawable.canDraw())

@@ -35,15 +35,28 @@ quark QBond : Fail {
       return false;
 
     EventWindow ew;
+
+    if (!ew.isAccessible(site))
+      return false;
+
+    if (!ew.isAccessible(siteOther))
+      return false;
+
+    C2D coord = ew.getCoordRaw(site);
+    C2D coordOther = ew.getCoordRaw(siteOther);
+    if (coord.manhattanDistance(coordOther) > cMAX_DIST)
+      return false;
+
     Atom& bondable = ew[siteOther];
     if (bondable as IBondable) {
-      C2D coord = ew.getCoordRaw(site);
-      C2D coordOther = ew.getCoordRaw(siteOther);
-      QBond& bonded = bondable.getBond(indexOther);
+      QBond& bondOther = bondable.getBond(indexOther);
+      if (bondOther.isBonded())
+        return false; // already bonded
+
       mSite = (Site) ew.getSiteNumber(coordOther - coord);
       mIndex = indexOther;
-      bonded.mSite = (Site) ew.getSiteNumber(coord - coordOther);
-      bonded.mIndex = index;
+      bondOther.mSite = (Site) ew.getSiteNumber(coord - coordOther);
+      bondOther.mIndex = index;
 
       return true;
 
