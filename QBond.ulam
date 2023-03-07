@@ -8,8 +8,18 @@ quark QBond : Fail {
   Site mSite = 0u;
   Index mIndex;
 
-  SiteNum getSite() {
+  SiteNum getSiteNumberRaw() {
     return mSite;
+  }
+
+  SiteNum getSiteNumber() {
+    EventWindowInverse ewi;
+    return ewi.getSiteNumber(mSite);
+  }
+
+  C2D getCoord() {
+    EventWindowInverse ewi;
+    return ewi.getCoord(mSite);
   }
 
   Bool isBonded() {
@@ -53,9 +63,8 @@ quark QBond : Fail {
       return true;
 
     EventWindow ew;
-    EventWindowInverse ewi;
     C2D coord = ew.getCoordRaw(site);
-    C2D coordBonded = coord + ewi.getCoord(mSite);
+    C2D coordBonded = coord + getCoord();
     if (!ew.isAccessible(coordBonded))
       return false;
 
@@ -80,10 +89,8 @@ quark QBond : Fail {
       return true;
 
     EventWindow ew;
-    EventWindowInverse ewi;
-
     C2D coord = ew.getCoordRaw(site);
-    C2D coordBonded = coord + ewi.getCoord(mSite);
+    C2D coordBonded = coord + getCoord();
     C2D coordOther = ew.getCoordRaw(siteOther);
     if (!ew.isAccessible(coordBonded))
       return false;
@@ -99,10 +106,8 @@ quark QBond : Fail {
       return;
 
     EventWindow ew;
-    EventWindowInverse ewi;
-
     C2D coord = ew.getCoordRaw(site);
-    C2D coordBonded = coord + ewi.getCoord(mSite);
+    C2D coordBonded = coord + getCoord();
     C2D coordOther = ew.getCoordRaw(siteOther);
     if (coordBonded.manhattanDistance(coordOther) > cMAX_DIST)
       fail("QBond.updateForSwap: can't swap without breaking a bond, check with QBond.checkForSwap before swapping");

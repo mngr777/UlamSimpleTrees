@@ -9,10 +9,12 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(100u, 2u) + QMortal {
 
   Void behave() {
     QBond& seqBond = getBond(cSEQUENCE);
-    if (seqBond.isBonded() || bind()) {
+    if (seqBond.isBonded() || attach()) {
       EventWindow ew;
-      Sequence& item = (Sequence&) ew[seqBond.getSite()];
+      Sequence& item = (Sequence&) ew[seqBond.getSiteNumber()];
       if (process(item)) {
+        getBond(cTREE).breakup();
+        getBond(cSEQUENCE).breakup();
         die();
         return;
       }
@@ -21,7 +23,7 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(100u, 2u) + QMortal {
     diffuse();
   }
 
-  Bool bind() {
+  Bool attach() {
     WindowServices ws;
     ws.reset(1u, QBond.cMAX_DIST);
 
@@ -57,35 +59,46 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(100u, 2u) + QMortal {
   }
 
   Void backward(Sequence& item) {
-    QBond& bond = getBond(cSEQUENCE);
-    QBond& bondPrev = item.getBond(Sequence.cPREV);
-
-    if (!bondPrev.isBonded())
-      return;
-
-    // TODO: fix site numbers
-
-    EventWindow ew;
-    SiteNum sitePrevRel = bondPrev.getSite();
-    SiteNum siteItem = bond.getSite();
-    SiteNum sitePrev = ew.getSiteNumber(ew.getCoord(siteItem) + ew.getCoord(sitePrevRel));
-
-    bond.breakup();
-    if (!bond.bond(cSEQUENCE, sitePrev, Sequence.cCOMMON)) {
-      if (!bond.bond(cSEQUENCE, siteItem, Sequence.cCOMMON)) {
-        DebugUtils du;
-        du.print("TreeBuilder.backward: failed to re-bound to current item, aborting");
-        getBond(cTREE).breakup();
-      }
-    }
+    traverse(item, Sequence.cPREV);
   }
 
   Void forward(Sequence& item) {
-      // TODO, don't forget to reset the flag
+    if (traverse(item, Sequence.cNEXT))
+      mFlagForward = false;
+  }
+
+  Bool traverse(Sequence& item, QBond.Index nextBondIndex) {
+    QBond& bond = getBond(cSEQUENCE);
+    QBond& bondNext = item.getBond(nextBondIndex);
+    QBond& bondCommon = item.getBond(Sequence.cCOMMON);
+
+    if (!bondNext.isBonded())
+      return false; // there's no next item
+
+    if (bondCommon.isBonded())
+      return false; // the next item is already attached to something else
+
+    EventWindow ew;
+
+    C2D coordNextRel = bondNext.getCoord();
+    C2D coordItem = bond.getCoord();
+    C2D coordNext = coordItem + coordNextRel;
+    if (!ew.isAccessible(coordNext))
+      return false;
+
+    bond.breakup();
+
+    if (!bond.bond(cSEQUENCE, ew.getSiteNumberRaw(coordNext), Sequence.cCOMMON)) {
+      DebugUtils du;
+      du.print("TreeBuilder: failed to move to next item, aborting");
+      getBond(cTREE).breakup();
+    }
+    return false;
   }
 
   Bool build(Sequence& item) {
-    // TODO
+    DebugUtils du;
+    du.print("building a tree!");
     return true;
   }
 }
