@@ -16,11 +16,11 @@ quark QBond : Fail {
     return mSite != 0u;
   }
 
-  Bool createBond(Index index, SiteNum siteOther, Index indexOther) {
-    return createBond(0u, index, siteOther, indexOther);
+  Bool bond(Index index, SiteNum siteOther, Index indexOther) {
+    return bond(0u, index, siteOther, indexOther);
   }
 
-  Bool createBond(SiteNum site, Index index, SiteNum siteOther, Index indexOther) {
+  Bool bond(SiteNum site, Index index, SiteNum siteOther, Index indexOther) {
     if (isBonded())
       return false;
 
@@ -39,16 +39,16 @@ quark QBond : Fail {
 
     } else {
       DebugUtils du;
-      du.print("QBond.createBond: the other atom is not bondable");
+      du.print("QBond.bond: the other atom is not bondable");
     }
     return false;
   }
 
-  Void destroyBond() {
-    destroyBond(0u);
+  Void breakup() {
+    breakup(0u);
   }
 
-  Bool destroyBond(SiteNum site) {
+  Bool breakup(SiteNum site) {
     if (!isBonded())
       return true;
 
@@ -65,7 +65,7 @@ quark QBond : Fail {
       bonded.mSite = 0u;
     } else {
       DebugUtils du;
-      du.print("QBond.destroyBond: other side of the bond is not bondable");
+      du.print("QBond.breakup: other side of the bond is not bondable");
     }
     mSite = 0u;
     return true;

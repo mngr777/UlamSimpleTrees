@@ -34,7 +34,7 @@ element SequenceTest : QMortal {
 
     // Bond the atoms in a sequence
     Sequence& ref1 = (Sequence&) ew[site1];
-    if (!ref1.getBond(Sequence.cNEXT).createBond(site1, Sequence.cNEXT, site2, Sequence.cPREV))
+    if (!ref1.getBond(Sequence.cNEXT).bond(site1, Sequence.cNEXT, site2, Sequence.cPREV))
       du.print("Failed to create initial bond");
 
     die();
