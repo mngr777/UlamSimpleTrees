@@ -4,11 +4,11 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
 
   constant Diffusability cCOMPLETE_DIFFUSABILITY = 10000u;
 
-  @Override virtual Diffusability getDiffusability() {
+  @Override Diffusability getDiffusability() {
     return cDIFFUSABILITY;
   }
 
-  @Override virtual WindowServices.Radius getDiffusionRadius() {
+  @Override WindowServices.Radius getDiffusionRadius() {
     return cDIFFUSION_RADIUS;
   }
 
@@ -35,7 +35,7 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
       Atom& other = ew[site];
       if (other as IDiffusable) {
         if (other.getDiffusability() > 0u
-            && other.getDiffusionRadius() == ew.getCoord(site).length())
+            && other.getDiffusionRadius() <= ew.getCoord(site).length())
         {
           Diffusability d1 = getDiffusability();
           Diffusability d2 = other.getDiffusability();

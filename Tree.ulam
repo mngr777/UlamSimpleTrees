@@ -1,6 +1,9 @@
 local typedef EventWindow.SiteNum SiteNum;
 
-element Tree : QBondableT(4u)  + QDiffusableT(100u, 2u) {
+/**
+   \symmetry all
+ */
+element Tree : QBondableT(4u) + QDiffusableT(1000u, 2u) {
   typedef DataUtils.Datum Datum;
 
   constant QBond.Index cCOMMON = 0u;
@@ -8,7 +11,11 @@ element Tree : QBondableT(4u)  + QDiffusableT(100u, 2u) {
   constant QBond.Index cRIGHT = 2u;
   constant QBond.Index cLEFT = 3u;
 
-  Datum mData;
+  Datum mData = 0x0;
+
+  Datum getData() {
+    return mData;
+  }
 
   Void setData(Datum data) {
     mData = data;
@@ -18,8 +25,11 @@ element Tree : QBondableT(4u)  + QDiffusableT(100u, 2u) {
     return !getBond(cPARENT).isBonded();
   }
 
-  // UrSelf
-  @Override virtual ARGB getColor(Unsigned selector) {
+  @Override Void behave() {
+    diffuse();
+  }
+
+  @Override ARGB getColor(Unsigned selector) {
     ColorUtils cu;
     Bits hex = 0x0000ff00;
     if (isRoot())

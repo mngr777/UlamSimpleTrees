@@ -1,6 +1,9 @@
 local typedef EventWindow.SiteNum SiteNum;
 
-element Sequence : QBondableT(3u) + QDiffusableT(100u, 2u) {
+/**
+   \symmetry all
+ */
+element Sequence : QBondableT(3u) + QDiffusableT(1000u, 2u) {
   typedef DataUtils.Datum Datum;
 
   constant QBond.Index cCOMMON = 0u;
@@ -13,6 +16,10 @@ element Sequence : QBondableT(3u) + QDiffusableT(100u, 2u) {
     mData = data;
   }
 
+  @Override Void behave() {
+    diffuse();
+  }
+
   Bool isFirst() {
     return !getBond(cPREV).isBonded();
   }
@@ -21,8 +28,7 @@ element Sequence : QBondableT(3u) + QDiffusableT(100u, 2u) {
     return !getBond(cNEXT).isBonded();
   }
 
-  // UrSelf
-  @Override virtual ARGB getColor(Unsigned selector) {
+  @Override ARGB getColor(Unsigned selector) {
     ColorUtils cu;
     Bits hex = 0x0000ff00;
     if (isFirst())

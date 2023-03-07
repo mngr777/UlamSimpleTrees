@@ -10,12 +10,11 @@ element Mover: QBondableT(1u) {
     mDir = dir;
   }
 
-  Void behave() {
-    C2D coord;
-    coord = coord.neighbor(mDir);
-
+  @Override Void behave() {
     EventWindow ew;
     SwapHelper sh;
+    C2D coord;
+    coord = coord.neighbor(mDir);
     sh.swap(0u, ew.getSiteNumber(coord));
   }
 }

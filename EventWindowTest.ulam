@@ -1,0 +1,131 @@
+local typedef EventWindow.SiteNum SiteNum;
+local typedef EventWindow.Symmetry Symmetry;
+
+// NOTE: remove "\placeable no" for elements in this file to be able
+// to run the test
+
+/**
+   \placeable no
+ */
+element EventWindowTestMark {}
+
+/**
+   Tests mapping grid site numbers/coordinates to current symmetry.
+
+   \color #00f
+   \placeable no
+ */
+element EventWindowTest + QMortal + Fail {
+  @Override Void behave() {
+    // NOTE: working for so long is apparently not allowed in MFM,
+    // getting "stale reference" error attempting a suicide,
+    // but the test itself works
+    for (SiteNum site = 0u; site < 41u; site++) {
+      for (Unsigned sym1 = 0u; sym1 <= 7u; sym1++) {
+        for (Unsigned sym2 = 0u; sym2 <= 7u; sym2++) {
+          test((Symmetry) sym1, (Symmetry) sym2, site);
+        }
+      }
+    }
+    cleanup();
+    die();
+  }
+
+  Void test(Symmetry sym1, Symmetry sym2, SiteNum site) {
+    printTestParams(sym1, sym2, site);
+
+    DebugUtils du;
+    EventWindow ew;
+    Symmetry sym = 0u;
+
+    cleanup();
+
+    // Switch to first symmetry
+    sym = ew.changeSymmetry(sym1); // {{
+
+    // Create an atom at the given site so we can reliably find the cell later.
+    C2D coordRaw = ew.getCoordRaw(site);
+    EventWindowTestMark mark;
+    ew[coordRaw] = mark;
+    // Check if coordinates match site number, just in case
+    if (!(ew[site] is EventWindowTestMark))
+      fail("ew[site] is not a mark");
+
+    // Get site number under default symmetry
+    SiteNum site0 = ew.getSiteNumber(coordRaw);
+
+    ew.changeSymmetry(sym); // }}
+
+    // Switch to secont symmetry
+    sym = ew.changeSymmetry(sym2); // {{
+
+    EventWindowInverse ewi;
+    SiteNum siteMapped = mapSite0(site0);
+    C2D coordMapped = ew.getCoordRaw(siteMapped);
+
+    if (!(ew[siteMapped] is EventWindowTestMark) || !(ew[coordMapped] is EventWindowTestMark)) {
+      du.print("site0:");
+      du.print(site0);
+      du.print("siteMapped:");
+      du.print(siteMapped);
+      du.print("coordMapped:");
+      du.print(coordMapped);
+      C2D markCoordRaw = findMarkCoordRaw();
+      du.print("markCoordRaw:");
+      du.print(markCoordRaw);
+      fail("ew[coord] is not a mark");
+    }
+
+    ew.changeSymmetry(sym); // }}
+  }
+
+  SiteNum mapSite0(SiteNum site0) {
+    EventWindowInverse ewi;
+    return ewi.getSiteNumber(site0);
+  }
+
+  Void printTestParams(Symmetry sym1, Symmetry sym2, SiteNum site)
+  {
+    DebugUtils du;
+    du.print("sym1:");
+    du.print(sym1);
+    du.print("sym2:");
+    du.print(sym2);
+    du.print("site:");
+    du.print(site);
+    du.print("------------");
+  }
+
+  C2D findMarkCoordRaw() {
+    EventWindow ew;
+    SiteNum site = findMarkSite();
+    return ew.getCoordRaw(site);
+  }
+
+  SiteNum findMarkSite() {
+    AtomUtils au;
+    WindowServices ws;
+    ws.reset(1u, 4u);
+    EventWindowTestMark mark;
+    ws.scan(au.getType(mark));
+    if (ws.getHits() == 0)
+      fail("Failed to find the mark");
+    if (ws.getHits() > 1)
+      fail("To many marks around!");
+    return ws.getPick();
+  }
+
+  Void cleanup() {
+    // Remove marks
+    EventWindow ew;
+    WindowServices ws;
+    ws.reset(1u, 4u);
+    for (Int slot = ws.next(); slot >= 0; slot = ws.next()) {
+      SiteNum site = (SiteNum) slot;
+      if (ew[site] is EventWindowTestMark) {
+        Empty empty;
+        ew[site] = empty;
+      }
+    }
+  }
+}

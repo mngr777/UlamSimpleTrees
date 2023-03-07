@@ -1,0 +1,8 @@
+quark QMortal {
+  // NOTE: no killing allowed, only suicide
+  Void die() {
+    EventWindow ew;
+    Empty empty;
+    ew[0] = empty;
+  }
+}

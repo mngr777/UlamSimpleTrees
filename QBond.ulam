@@ -1,6 +1,3 @@
-// NOTE:
-// - mSite stores a raw site number ot other end of the bond,
-//   but function arguments are site numbers under current symmetry
 quark QBond : Fail {
   typedef EventWindow.SiteNum SiteNum;
   typedef Unsigned(6) Site;
@@ -10,6 +7,10 @@ quark QBond : Fail {
 
   Site mSite = 0u;
   Index mIndex;
+
+  SiteNum getSite() {
+    return mSite;
+  }
 
   Bool isBonded() {
     return mSite != 0u;
@@ -24,14 +25,14 @@ quark QBond : Fail {
       return false;
 
     EventWindow ew;
-    Atom& bondable = ew.aref(siteOther);
+    Atom& bondable = ew[siteOther];
     if (bondable as IBondable) {
-      C2D coord = ew.getCoord(site);
-      C2D coordOther = ew.getCoord(siteOther);
+      C2D coord = ew.getCoordRaw(site);
+      C2D coordOther = ew.getCoordRaw(siteOther);
       QBond& bonded = bondable.getBond(indexOther);
-      mSite = (Site) ew.getSiteNumberRaw(coordOther - coord);
+      mSite = (Site) ew.getSiteNumber(coordOther - coord);
       mIndex = indexOther;
-      bonded.mSite = (Site) ew.getSiteNumberRaw(coord - coordOther);
+      bonded.mSite = (Site) ew.getSiteNumber(coord - coordOther);
       bonded.mIndex = index;
 
       return true;
@@ -47,23 +48,27 @@ quark QBond : Fail {
     destroyBond(0u);
   }
 
-  Void destroyBond(SiteNum site) {
+  Bool destroyBond(SiteNum site) {
     if (!isBonded())
-      return;
+      return true;
 
     EventWindow ew;
-    C2D coord = ew.getCoord(site);
-    C2D coordBonded = coord + ew.getCoordRaw(mSite);
+    EventWindowInverse ewi;
+    C2D coord = ew.getCoordRaw(site);
+    C2D coordBonded = coord + ewi.getCoord(mSite);
+    if (!ew.isAccessible(coordBonded))
+      return false;
+
     Atom& bondable = ew[coordBonded];
     if (bondable as IBondable) {
       QBond& bonded = bondable.getBond(mIndex);
-      mSite = 0u;
       bonded.mSite = 0u;
-
     } else {
       DebugUtils du;
-      du.print("QBond.destroyBond: other of the bond is not boundable");
+      du.print("QBond.destroyBond: other side of the bond is not bondable");
     }
+    mSite = 0u;
+    return true;
   }
 
   Bool checkForSwap(SiteNum siteOther) {
@@ -75,14 +80,13 @@ quark QBond : Fail {
       return true;
 
     EventWindow ew;
-    C2D coord = ew.getCoord(site);
-    C2D coordBonded = coord + ew.getCoordRaw(mSite);
-    C2D coordOther = ew.getCoord(siteOther);
-    if (!ew.isAccessible(coordBonded)) {
-      // The normal reason for this is that the atom owning this bond is not at
-      // the event window origin
+    EventWindowInverse ewi;
+
+    C2D coord = ew.getCoordRaw(site);
+    C2D coordBonded = coord + ewi.getCoord(mSite);
+    C2D coordOther = ew.getCoordRaw(siteOther);
+    if (!ew.isAccessible(coordBonded))
       return false;
-    }
     return coordBonded.manhattanDistance(coordOther) <= cMAX_DIST;
   }
 
@@ -95,28 +99,30 @@ quark QBond : Fail {
       return;
 
     EventWindow ew;
+    EventWindowInverse ewi;
 
-    C2D coord = ew.getCoord(site);
-    C2D coordBonded = coord + ew.getCoordRaw(mSite);
-    C2D coordOther = ew.getCoord(siteOther);
+    C2D coord = ew.getCoordRaw(site);
+    C2D coordBonded = coord + ewi.getCoord(mSite);
+    C2D coordOther = ew.getCoordRaw(siteOther);
     if (coordBonded.manhattanDistance(coordOther) > cMAX_DIST)
-      fail("QBond.updateForSwap: distance exceeds the limit");
+      fail("QBond.updateForSwap: can't swap without breaking a bond, check with QBond.checkForSwap before swapping");
 
     Atom& bondable = ew[coordBonded];
     if (bondable as IBondable) {
       QBond& bonded = bondable.getBond(mIndex);
 
-      if (coordBonded != coordOther) {
-        mSite = (Site) ew.getSiteNumberRaw(coordBonded - coordOther);
-        bonded.mSite = (Site) ew.getSiteNumberRaw(coordOther - coordBonded);
+      if (coordOther != coordBonded) {
+        C2D diff = coordBonded - coordOther;
+        mSite = (Site) ew.getSiteNumber(diff);
+        bonded.mSite = (Site) ew.getSiteNumber(-diff);
       } else {
         // Swapping bond ends, update only this one
-        mSite = (Site) ew.getSiteNumberRaw(coord - coordOther);
+        mSite = (Site) ew.getSiteNumber(coord - coordBonded);
       }
 
     } else {
       DebugUtils du;
-      du.print("QBond.updateForSwap: other of the bond is not boundable");
+      du.print("QBond.updateForSwap: other side of the bond is not bondable");
     }
   }
 }

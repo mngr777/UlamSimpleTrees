@@ -1,0 +1,91 @@
+/**
+    \symbol TB
+ */
+element TreeBuilder : QBondableT(2u) + QDiffusableT(100u, 2u) + QMortal {
+  constant QBond.Index cSEQUENCE = 0u;
+  constant QBond.Index cTREE = 1u;
+
+  Bool mFlagForward = false;
+
+  Void behave() {
+    QBond& seqBond = getBond(cSEQUENCE);
+    if (seqBond.isBonded() || bind()) {
+      EventWindow ew;
+      Sequence& item = (Sequence&) ew[seqBond.getSite()];
+      if (process(item)) {
+        die();
+        return;
+      }
+    }
+
+    diffuse();
+  }
+
+  Bool bind() {
+    WindowServices ws;
+    ws.reset(1u, QBond.cMAX_DIST);
+
+    Sequence sequence;
+    AtomUtils au;
+    ws.scan(au.getType(sequence));
+    if (ws.getHits() == 0u)
+      return false;
+
+    return getBond(cSEQUENCE)
+      .createBond(cSEQUENCE, ws.getPick(), Sequence.cCOMMON);
+  }
+
+  Bool process(Sequence& item) {
+    if (!getBond(cTREE).isBonded() && !item.isFirst()) {
+      // Find first item to start building
+      backward(item);
+
+    } else if (mFlagForward) {
+      // Move to next item
+      forward(item);
+
+    } else if (build(item)) {
+      if (!item.isLast()) {
+        // More work to do
+        mFlagForward = true;
+      } else {
+        // Done
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Void backward(Sequence& item) {
+    QBond& bond = getBond(cSEQUENCE);
+    QBond& bondPrev = item.getBond(Sequence.cPREV);
+
+    if (!bondPrev.isBonded())
+      return;
+
+    // TODO: fix site numbers
+
+    EventWindow ew;
+    SiteNum sitePrevRel = bondPrev.getSite();
+    SiteNum siteItem = bond.getSite();
+    SiteNum sitePrev = ew.getSiteNumber(ew.getCoord(siteItem) + ew.getCoord(sitePrevRel));
+
+    bond.destroyBond();
+    if (!bond.createBond(cSEQUENCE, sitePrev, Sequence.cCOMMON)) {
+      if (!bond.createBond(cSEQUENCE, siteItem, Sequence.cCOMMON)) {
+        DebugUtils du;
+        du.print("TreeBuilder.backward: failed to re-bound to current item, aborting");
+        getBond(cTREE).destroyBond();
+      }
+    }
+  }
+
+  Void forward(Sequence& item) {
+      // TODO, don't forget to reset the flag
+  }
+
+  Bool build(Sequence& item) {
+    // TODO
+    return true;
+  }
+}

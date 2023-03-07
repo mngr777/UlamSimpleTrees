@@ -3,26 +3,26 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
 
   QBond mBonds[cMAX_BOND_NUM];
 
-  @Override virtual QBond& getBond(QBond.Index index) {
+  @Override QBond& getBond(QBond.Index index) {
     if (index >= cMAX_BOND_NUM)
       fail("TBondable.getBond: index is out of bounds");
     return mBonds[index];
   }
 
-  @Override virtual Bool checkBondsForSwap(SiteNum site, SiteNum siteOther) {
+  @Override Bool checkBondsForSwap(SiteNum site, SiteNum siteOther) {
     for (QBond.Index i = 0u; i < cMAX_BOND_NUM; i++)
       if (!getBond(i).checkForSwap(site, siteOther))
         return false;
     return true;
   }
 
-  @Override virtual Void updateBondsForSwap(SiteNum site, SiteNum siteOther) {
+  @Override Void updateBondsForSwap(SiteNum site, SiteNum siteOther) {
     for (QBond.Index i = 0u; i < cMAX_BOND_NUM; i++)
       getBond(i).updateForSwap(site, siteOther);
   }
 
   // UrSelf::renderGraphics()
-  @Override virtual Void renderGraphics() {
+  @Override Void renderGraphics() {
     Drawable drawable;
     if (!drawable.canDraw())
       return;

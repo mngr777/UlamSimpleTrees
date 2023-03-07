@@ -1,0 +1,22 @@
+quark TreeData {
+  typedef DataUtils.Datum Datum;
+  typedef DataUtils.Byte Byte;
+
+  typedef Unsigned(2) Arity;
+
+  // arity
+  // v
+  // | 0 1 | 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+  constant Byte cARITY_MASK = 0b11000000;
+
+  DataUtils dd;
+
+  Arity getArity(Datum datum) {
+     return (Arity) (dd.getHi(datum) & cARITY_MASK);
+  }
+
+  Datum setArity(Datum datum, Arity arity) {
+    Byte hi = dd.getHi(datum) & cARITY_MASK | arity;
+    return dd.setHi(datum, hi);
+  }
+}

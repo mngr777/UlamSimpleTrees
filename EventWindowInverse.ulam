@@ -1,0 +1,50 @@
+/**
+   Maps site number/coordinates of a cell under default symmmetry to current
+   symmetry. For example, EventWindowInverse.getCoord(C2D(0, -1)) always points
+   North.
+   This allows to store cell position and address it under different symmetry.
+ */
+quark EventWindowInverse {
+  typedef EventWindow.SiteNum SiteNum;
+  typedef EventWindow.Symmetry Symmetry;
+
+  EventWindow ew;
+
+  SiteNum getSiteNumber(SiteNum site) {
+    C2D coord = getCoord(site);
+    return ew.getSiteNumberRaw(coord);
+  }
+
+  C2D getCoord(SiteNum site) {
+    C2D coord = ew.getCoordRaw(site);
+    return mapSym(coord);
+  }
+
+  C2D mapSym(C2D coord) {
+    Symmetry sym = ew.getSymmetry();
+
+    if (sym == EventWindow.cSYMMETRY_090L)
+      return coord.make(coord.getY(), -coord.getX()); // rotate left
+
+    if (sym == EventWindow.cSYMMETRY_180L)
+      return coord.make(-coord.getX(), -coord.getY()); // negate
+
+    if (sym == EventWindow.cSYMMETRY_270L)
+      return coord.make(-coord.getY(), coord.getX()); // rotate right
+
+    if (sym == EventWindow.cSYMMETRY_000R)
+      return coord.make(coord.getX(), -coord.getY()); // negate Y
+
+    if (sym == EventWindow.cSYMMETRY_090R)
+      return coord.make(coord.getY(), coord.getX()); // rotate right, negate Y
+
+    if (sym == EventWindow.cSYMMETRY_180R)
+      return coord.make(-coord.getX(), coord.getY()); // negate, negate Y
+
+    if (sym == EventWindow.cSYMMETRY_270R)
+      return coord.make(-coord.getY(), -coord.getX()); // rotate left, negate Y
+
+    // if (sym == EventWindow.cSYMMETRY_000L)
+    return coord;
+  }
+}

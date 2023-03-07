@@ -3,8 +3,8 @@ local typedef EventWindow.SiteNum SiteNum;
 /**
    \color #00f
  */
-element TreeTest {
-  Void behave() {
+element TreeTest : QMortal {
+  @Override Void behave() {
     EventWindow ew;
     if (ew.isEmpty(1)) {
 

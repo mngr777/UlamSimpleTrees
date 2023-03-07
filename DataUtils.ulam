@@ -10,7 +10,15 @@ quark DataUtils {
     return (Byte) (datum >> 8);
   }
 
+  Datum setHi(Datum datum, Byte hi) {
+    return (Datum) (datum & 0xff | (hi << 8));
+  }
+
   Byte getLo(Datum datum) {
     return (Byte) datum;
+  }
+
+  Datum setLo(Datum datum, Byte lo) {
+    return datum & 0xff00 | lo;
   }
 }
