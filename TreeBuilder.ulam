@@ -1,17 +1,18 @@
 /**
     \symbol TB
+    \symmetry all
  */
-element TreeBuilder : QBondableT(2u) + QDiffusableT(100u, 2u) + QMortal {
+element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   constant QBond.Index cSEQUENCE = 0u;
   constant QBond.Index cTREE = 1u;
 
   Bool mFlagForward = false;
 
   Void behave() {
-    QBond& seqBond = getBond(cSEQUENCE);
-    if (seqBond.isBonded() || attach()) {
+    QBond& bondSeq = getBond(cSEQUENCE);
+    if (bondSeq.isBonded() || attach()) {
       EventWindow ew;
-      Sequence& item = (Sequence&) ew[seqBond.getSiteNumber()];
+      Sequence& item = (Sequence&) ew[bondSeq.getSiteNumber()];
       if (process(item)) {
         getBond(cTREE).breakup();
         getBond(cSEQUENCE).breakup();
@@ -24,6 +25,9 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(100u, 2u) + QMortal {
   }
 
   Bool attach() {
+    if (getBond(cSEQUENCE).isBonded())
+      return true;
+
     WindowServices ws;
     ws.reset(1u, QBond.cMAX_DIST);
 
@@ -68,37 +72,37 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(100u, 2u) + QMortal {
   }
 
   Bool traverse(Sequence& item, QBond.Index nextBondIndex) {
-    QBond& bond = getBond(cSEQUENCE);
+    QBond& bondSeq = getBond(cSEQUENCE);
     QBond& bondNext = item.getBond(nextBondIndex);
-    QBond& bondCommon = item.getBond(Sequence.cCOMMON);
 
     if (!bondNext.isBonded())
       return false; // there's no next item
 
-    if (bondCommon.isBonded())
-      return false; // the next item is already attached to something else
-
     EventWindow ew;
 
-    C2D coordNextRel = bondNext.getCoord();
-    C2D coordItem = bond.getCoord();
-    C2D coordNext = coordItem + coordNextRel;
+    C2D coordItem = bondSeq.getCoord();
+    C2D coordNext = coordItem + bondNext.getCoord();
     if (!ew.isAccessible(coordNext))
       return false;
 
-    bond.breakup();
+    Sequence& itemNext = (Sequence&) ew[coordNext];
+    if (itemNext.getBond(Sequence.cCOMMON).isBonded())
+      return false; // next item is already attached to something else
 
-    if (!bond.bond(cSEQUENCE, ew.getSiteNumberRaw(coordNext), Sequence.cCOMMON)) {
-      DebugUtils du;
-      du.print("TreeBuilder: failed to move to next item, aborting");
-      getBond(cTREE).breakup();
+    if (!bondSeq.breakup())
+      return false;
+
+    if (!bondSeq.bond(cSEQUENCE, ew.getSiteNumberRaw(coordNext), Sequence.cCOMMON)) {
+      // DebugUtils du;
+      // du.print("TreeBuilder: failed to move to next item, aborting");
+      // getBond(cTREE).breakup();
+      Fail fl;
+      fl.fail("TreeBuilder.traverse: failed to bond to next item");
     }
     return false;
   }
 
   Bool build(Sequence& item) {
-    DebugUtils du;
-    du.print("building a tree!");
     return true;
   }
 }

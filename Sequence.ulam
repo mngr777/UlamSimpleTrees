@@ -1,5 +1,6 @@
 local typedef EventWindow.SiteNum SiteNum;
 
+
 /**
    \symmetry all
  */
@@ -31,10 +32,13 @@ element Sequence : QBondableT(3u) + QDiffusableT(1000u, 2u) {
   @Override ARGB getColor(Unsigned selector) {
     ColorUtils cu;
     Bits hex = 0x0000ff00;
-    if (isFirst())
-      hex = 0x00ff0000;
-    else
-      hex = 0x000000ff;
+    if (isFirst()) {
+      hex = 0x00ff0000; // red
+    } else if (isLast()) {
+      hex = 0x000000ff; // blue
+    } else {
+      hex = 0x0000ff00; // green
+    }
     return cu.color(hex);
   }
 }

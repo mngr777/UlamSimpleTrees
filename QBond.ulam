@@ -36,10 +36,7 @@ quark QBond : Fail {
 
     EventWindow ew;
 
-    if (!ew.isAccessible(site))
-      return false;
-
-    if (!ew.isAccessible(siteOther))
+    if (!ew.isAccessible(site) || !ew.isAccessible(siteOther))
       return false;
 
     C2D coord = ew.getCoordRaw(site);
@@ -51,11 +48,12 @@ quark QBond : Fail {
     if (bondable as IBondable) {
       QBond& bondOther = bondable.getBond(indexOther);
       if (bondOther.isBonded())
-        return false; // already bonded
+        return false; // the other end is already bonded
 
-      mSite = (Site) ew.getSiteNumber(coordOther - coord);
+      C2D diff = coordOther - coord;
+      mSite = (Site) ew.getSiteNumber(diff);
       mIndex = indexOther;
-      bondOther.mSite = (Site) ew.getSiteNumber(coord - coordOther);
+      bondOther.mSite = (Site) ew.getSiteNumber(-diff);
       bondOther.mIndex = index;
 
       return true;
@@ -67,8 +65,8 @@ quark QBond : Fail {
     return false;
   }
 
-  Void breakup() {
-    breakup(0u);
+  Bool breakup() {
+    return breakup(0u);
   }
 
   Bool breakup(SiteNum site) {
@@ -76,21 +74,25 @@ quark QBond : Fail {
       return true;
 
     EventWindow ew;
+
     C2D coord = ew.getCoordRaw(site);
     C2D coordBonded = coord + getCoord();
-    if (!ew.isAccessible(coordBonded))
+    if (!ew.isAccessible(coord) || !ew.isAccessible(coordBonded))
       return false;
 
     Atom& bondable = ew[coordBonded];
     if (bondable as IBondable) {
-      QBond& bonded = bondable.getBond(mIndex);
-      bonded.mSite = 0u;
+      QBond& bondOther = bondable.getBond(mIndex);
+      bondOther.mSite = 0u;
+      mSite = 0u;
+      return true;
+
     } else {
       DebugUtils du;
       du.print("QBond.breakup: other side of the bond is not bondable");
     }
-    mSite = 0u;
-    return true;
+
+    return false;
   }
 
   Bool checkForSwap(SiteNum siteOther) {
@@ -105,8 +107,10 @@ quark QBond : Fail {
     C2D coord = ew.getCoordRaw(site);
     C2D coordBonded = coord + getCoord();
     C2D coordOther = ew.getCoordRaw(siteOther);
-    if (!ew.isAccessible(coordBonded))
+
+    if (!ew.isAccessible(coord) || !ew.isAccessible(coordBonded) || !ew.isAccessible(coordOther))
       return false;
+
     return coordBonded.manhattanDistance(coordOther) <= cMAX_DIST;
   }
 
@@ -122,6 +126,10 @@ quark QBond : Fail {
     C2D coord = ew.getCoordRaw(site);
     C2D coordBonded = coord + getCoord();
     C2D coordOther = ew.getCoordRaw(siteOther);
+
+    if (!ew.isAccessible(coord) || !ew.isAccessible(coordBonded) || !ew.isAccessible(coordOther))
+      fail("QBond.updateForSwap: some sites are inaccessible, check with QBond.checkForSwap before swapping");
+
     if (coordBonded.manhattanDistance(coordOther) > cMAX_DIST)
       fail("QBond.updateForSwap: can't swap without breaking a bond, check with QBond.checkForSwap before swapping");
 
@@ -139,8 +147,10 @@ quark QBond : Fail {
       }
 
     } else {
-      DebugUtils du;
-      du.print("QBond.updateForSwap: other side of the bond is not bondable");
+      // DebugUtils du;
+      // du.print("QBond.updateForSwap: other side of the bond is not bondable");
+      Fail fl;
+      fl.fail("QBond.updateForSwap: other side of the bond is not bondable");
     }
   }
 }

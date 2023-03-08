@@ -37,7 +37,6 @@ element TreeSequenceTest : QBondableT(1u) + QMortal {
 
     QBond& bond = getBond(0);
 
-    // Find an empty site
     SiteNum siteNext = findEmptySite();
     if (siteNext == SiteNum.maxof)
       return false;
@@ -47,7 +46,7 @@ element TreeSequenceTest : QBondableT(1u) + QMortal {
     next.setData(makeDatum(mArities[mCounter]));
     ew[siteNext] = next;
 
-    // Bond to previous item
+    // Bond next item to previous item
     if (bond.isBonded()) {
       SiteNum sitePrev = bond.getSiteNumber();
       Sequence& prev = (Sequence&) ew[sitePrev];
@@ -60,7 +59,8 @@ element TreeSequenceTest : QBondableT(1u) + QMortal {
       }
 
       // detach from previous item
-      bond.breakup();
+      if (!bond.breakup())
+        du.print("Failed to detach from previous item");
     }
 
     // Attach to next item
@@ -72,7 +72,43 @@ element TreeSequenceTest : QBondableT(1u) + QMortal {
   }
 
   Bool buildTreeBuilder() {
-    getBond(0).breakup();
+    DebugUtils du;
+
+    SiteNum site = findEmptySite();
+    if (site == SiteNum.maxof)
+      return false;
+
+    EventWindow ew;
+
+    QBond& bond = getBond(0);
+    if (!bond.isBonded())
+      return true; // no sequence built, this shouldn't happen
+
+    // Get the last item
+    SiteNum siteItem = bond.getSiteNumber();
+    Sequence& item = (Sequence&) ew[siteItem];
+    if (!bond.breakup()) {
+      du.print("Failed to detach from last item");
+      return false;
+    }
+
+    TreeBuilder builder;
+    ew[site] = builder;
+
+    // Attach builder to item manually so they won't run apart
+    TreeBuilder& refBuilder = (TreeBuilder&) ew[site];
+    QBond& bondSeq = refBuilder.getBond(TreeBuilder.cSEQUENCE);
+    if (!bondSeq.bond(site, TreeBuilder.cSEQUENCE, siteItem, Sequence.cCOMMON)) {
+      // Failed to bond the builder, reattach to item
+      // du.print("Failed to attach the builder, reattaching to the last item");
+      if (!bond.bond(0, siteItem, Sequence.cCOMMON))
+        du.print("Failed to re-attach to the last item");
+      // cleanup and try again
+      Empty empty;
+      ew[site] = empty;
+      return false;
+    }
+
     return true;
   }
 
