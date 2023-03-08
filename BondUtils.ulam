@@ -1,0 +1,71 @@
+quark BondUtils + Fail {
+  typedef EventWindow.SiteNum SiteNum;
+  typedef QBond.Index Index;
+
+  DebugUtils du;
+  EventWindow ew;
+
+  Bool traverse(Index index, Index indexNext, Index indexBond) {
+    return traverse(0u, index, indexNext, indexBond);
+  }
+
+  Bool traverse(SiteNum site, Index index, Index indexNext, Index indexBond) {
+    if (!ew.isAccessible(site))
+      return false;
+
+    // Get atom
+    if (!(ew[site] is IBondable)) {
+      fail("BondUtils.traverse: atom is not IBondable");
+      return false;
+    }
+    IBondable& obj = (IBondable&) ew[site];
+    QBond& bond = obj.getBond(index);
+    if (!bond.isBonded())
+      return false; // atom is not bonded to anything
+
+    // Get coordinates of attached item
+    C2D coord = ew.getCoordRaw(site);
+    C2D coordItem = coord + bond.getCoord();
+    if (!ew.isAccessible(coordItem))
+      return false;
+
+    // Get attached item
+    if (!ew[coordItem] is IBondable) {
+      fail("BondUtils.traverse: attached atom is not IBondable");
+      return false;
+    }
+    IBondable& item = (IBondable&) ew[coordItem];
+    QBond& bondNext = item.getBond(indexNext);
+    if (!bondNext.isBonded())
+      return false; // there's no next item (maybe need to return status to check for this case)
+
+    // Get coordinates of next item
+    C2D coordNext = coordItem + bondNext.getCoord();
+    if (!ew.isAccessible(coordNext))
+      return false;
+
+    // Get next item
+    if (!(ew[coordNext] is IBondable)) {
+      fail("BondUtils.traverse: next atom is not IBondable");
+      return false;
+    }
+    IBondable& next = (IBondable&) ew[coordNext];
+
+    // Remember current index in case we need to reattach
+    Index indexItem = bond.getIndex();
+
+    // Detach
+    if (!bond.breakup())
+      return false;
+
+    // Try to attach to next item
+    SiteNum siteNext = ew.getSiteNumberRaw(coordNext);
+    if (!bond.bond(site, index, siteNext, indexBond)) {
+      // Reattach to previous item, better luck next time
+      SiteNum siteItem = ew.getSiteNumberRaw(coordItem);
+      bond.bond(site, index, siteItem, indexItem);
+    }
+
+    return true;
+  }
+}

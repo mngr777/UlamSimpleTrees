@@ -44,11 +44,11 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   Bool process(Sequence& item) {
     if (!getBond(cTREE).isBonded() && !item.isFirst()) {
       // Find first item to start building
-      backward(item);
+      backward();
 
     } else if (mFlagForward) {
       // Move to next item
-      forward(item);
+      forward();
 
     } else if (build(item)) {
       if (!item.isLast()) {
@@ -62,44 +62,15 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
     return false;
   }
 
-  Void backward(Sequence& item) {
-    traverse(item, Sequence.cPREV);
+  Void backward() {
+    BondUtils bu;
+    bu.traverse(cSEQUENCE, Sequence.cPREV, Sequence.cCOMMON);
   }
 
-  Void forward(Sequence& item) {
-    if (traverse(item, Sequence.cNEXT))
+  Void forward() {
+    BondUtils bu;
+    if (bu.traverse(cSEQUENCE, Sequence.cNEXT, Sequence.cCOMMON))
       mFlagForward = false;
-  }
-
-  Bool traverse(Sequence& item, QBond.Index nextBondIndex) {
-    QBond& bondSeq = getBond(cSEQUENCE);
-    QBond& bondNext = item.getBond(nextBondIndex);
-
-    if (!bondNext.isBonded())
-      return false; // there's no next item
-
-    EventWindow ew;
-
-    C2D coordItem = bondSeq.getCoord();
-    C2D coordNext = coordItem + bondNext.getCoord();
-    if (!ew.isAccessible(coordNext))
-      return false;
-
-    Sequence& itemNext = (Sequence&) ew[coordNext];
-    if (itemNext.getBond(Sequence.cCOMMON).isBonded())
-      return false; // next item is already attached to something else
-
-    if (!bondSeq.breakup())
-      return false;
-
-    if (!bondSeq.bond(cSEQUENCE, ew.getSiteNumberRaw(coordNext), Sequence.cCOMMON)) {
-      // DebugUtils du;
-      // du.print("TreeBuilder: failed to move to next item, aborting");
-      // getBond(cTREE).breakup();
-      Fail fl;
-      fl.fail("TreeBuilder.traverse: failed to bond to next item");
-    }
-    return false;
   }
 
   Bool build(Sequence& item) {

@@ -22,6 +22,10 @@ quark QBond : Fail {
     return ewi.getCoord(mSite);
   }
 
+  Index getIndex() {
+    return mIndex;
+  }
+
   Bool isBonded() {
     return mSite != 0u;
   }
