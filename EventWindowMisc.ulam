@@ -1,0 +1,19 @@
+quark EventWindowMisc {
+  typedef EventWindow.SiteNum SiteNum;
+  typedef WindowServices.Radius Radius;
+
+  EventWindow ew;
+
+  SiteNum findEmptySite(Radius last) {
+    return findEmptySite(1u, last);
+  }
+
+  SiteNum findEmptySite(Radius first, Radius last) {
+    WindowServices ws;
+    ws.reset(first, last);
+    ws.scan(WindowServices.cEMPTY_SITES_HIT);
+    if (ws.getHits() == 0u)
+      return SiteNum.maxof;
+    return ws.getPick();
+  }
+}

@@ -8,8 +8,8 @@ element Tree : QBondableT(4u) + QDiffusableT(1000u, 2u) {
 
   constant QBond.Index cCOMMON = 0u;
   constant QBond.Index cPARENT = 1u;
-  constant QBond.Index cRIGHT = 2u;
-  constant QBond.Index cLEFT = 3u;
+  constant QBond.Index cLEFT = 2u;
+  constant QBond.Index cRIGHT = 3u;
 
   Datum mData = 0x0;
 
@@ -25,15 +25,32 @@ element Tree : QBondableT(4u) + QDiffusableT(1000u, 2u) {
     return !getBond(cPARENT).isBonded();
   }
 
+  Bool isTerm() {
+    return getChildNum() == 0u;
+  }
+
+  Unsigned getChildNum() {
+    Unsigned num = 0u;
+    if (getBond(cLEFT).isBonded())
+      num++;
+    if (getBond(cRIGHT).isBonded())
+      num++;
+    return num;
+  }
+
   @Override Void behave() {
     diffuse();
   }
 
   @Override ARGB getColor(Unsigned selector) {
     ColorUtils cu;
-    Bits hex = 0x0000ff00;
-    if (isRoot())
-      hex = 0x00ff0000;
+    Bits hex = 0x00ffff00; // yellow
+    if (isRoot()) {
+      hex = 0x00ff00ff; // magenta
+
+    } else if (isTerm()) {
+      hex = 0x0000ffff; // cyan
+    }
     return cu.color(hex);
   }
 }

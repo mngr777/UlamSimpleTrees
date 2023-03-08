@@ -11,7 +11,11 @@ element Sequence : QBondableT(3u) + QDiffusableT(1000u, 2u) {
   constant QBond.Index cPREV = 1u;
   constant QBond.Index cNEXT = 2u;
 
-  Datum mData;
+  Datum mData = 0x0;
+
+  Datum getData() {
+    return mData;
+  }
 
   Void setData(Datum data) {
     mData = data;
@@ -31,13 +35,11 @@ element Sequence : QBondableT(3u) + QDiffusableT(1000u, 2u) {
 
   @Override ARGB getColor(Unsigned selector) {
     ColorUtils cu;
-    Bits hex = 0x0000ff00;
+    Bits hex = 0x0000ff00; // green
     if (isFirst()) {
       hex = 0x00ff0000; // red
     } else if (isLast()) {
       hex = 0x000000ff; // blue
-    } else {
-      hex = 0x0000ff00; // green
     }
     return cu.color(hex);
   }

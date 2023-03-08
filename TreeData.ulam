@@ -12,11 +12,11 @@ quark TreeData {
   DataUtils dd;
 
   Arity getArity(Datum datum) {
-     return (Arity) (dd.getHi(datum) & cARITY_MASK);
+    return (Arity) ((dd.getHi(datum) & cARITY_MASK) >> 6);
   }
 
   Datum setArity(Datum datum, Arity arity) {
-    Byte hi = dd.getHi(datum) & cARITY_MASK | arity;
+    Byte hi = dd.getHi(datum) & cARITY_MASK | (Byte) (arity << 6);
     return dd.setHi(datum, hi);
   }
 }

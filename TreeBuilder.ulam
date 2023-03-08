@@ -74,6 +74,81 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   }
 
   Bool build(Sequence& item) {
+    QBond& bond = getBond(cTREE);
+    if (!bond.isBonded())
+      return buildRoot(item);
+
+    EventWindow ew;
+    EventWindowMisc ewm;
+    TreeData td;
+
+    SiteNum siteTree = bond.getSiteNumber();
+    Tree& tree = (Tree&) ew[siteTree];
+    TreeData.Arity arityTree = td.getArity(tree.getData());
+
+    if (tree.getChildNum() == arityTree) {
+      // Subtree is complete, move up
+      up();
+      return false;
+    }
+
+    SiteNum site = ewm.findEmptySite(QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return false;
+
+    // Build child
+    Tree child;
+    child.setData(item.getData());
+    ew[site] = child;
+
+    // Bond child to parent
+    QBond.Index indexChild = (tree.getChildNum() == 0u)
+      ? Tree.cLEFT
+      : Tree.cRIGHT;
+    QBond& bondChild = tree.getBond(indexChild);
+    if (!bondChild.bond(siteTree, indexChild, site, Tree.cPARENT)) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return false;
+    }
+
+    // Go down
+    down(indexChild); // TODO: store child index and retry on the next step in failed
+
     return true;
+  }
+
+  Bool buildRoot(Sequence& item) {
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    SiteNum site = ewm.findEmptySite(QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return false;
+
+    // Build tree
+    Tree tree;
+    tree.setData(item.getData());
+    ew[site] = tree;
+
+    // Bond to it
+    if (!getBond(cTREE).bond(cTREE, site, Tree.cCOMMON)) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return false;
+    }
+    return true;
+  }
+
+  Void up() {
+    BondUtils bu;
+    bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
+  }
+
+  Void down(QBond.Index index) {
+    BondUtils bu;
+    bu.traverse(cTREE, index, Tree.cCOMMON);
   }
 }
