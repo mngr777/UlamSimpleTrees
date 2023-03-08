@@ -16,18 +16,34 @@ element EventWindowTestMark {}
    \placeable no
  */
 element EventWindowTest + QMortal + Fail {
+  Symmetry mSym1 = 0u;
+  Symmetry mSym2 = 0u;
+  SiteNum mSite = 1u;
+
   @Override Void behave() {
-    // NOTE: working for so long is apparently not allowed in MFM,
-    // getting "stale reference" error attempting a suicide,
-    // but the test itself works
-    for (SiteNum site = 0u; site < 41u; site++) {
-      for (Unsigned sym1 = 0u; sym1 <= 7u; sym1++) {
-        for (Unsigned sym2 = 0u; sym2 <= 7u; sym2++) {
-          test((Symmetry) sym1, (Symmetry) sym2, site);
-        }
-      }
-    }
+    test(mSym1, mSym2, mSite);
     cleanup();
+
+    // next site
+    if (mSite < 40u) {
+      mSite++;
+      return;
+    }
+
+    // next symmetry 2
+    mSite = 1u;
+    if (mSym2 < 7u) {
+      mSym2++;
+      return;
+    }
+
+    // next symmetry 1
+    mSym2 = 0u;
+    if (mSym1 < 7u) {
+      mSym1++;
+      return;
+    }
+
     die();
   }
 
