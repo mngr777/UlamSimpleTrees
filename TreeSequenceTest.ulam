@@ -2,6 +2,17 @@ local typedef DataUtils.Datum Datum;
 
 /**
    \symbol TS
+   \color #0ff
+ */
+element TreeSequenceTestParameters {
+  /**
+     Attach TreeBuilder to sequence.
+   */
+  parameter Bool pATTACH_BUILDER = true;
+}
+
+/**
+   \symbol TS
    \color #00f
    \symmetry all
  */
@@ -26,8 +37,11 @@ element TreeSequenceTest : QBondableT(1u) + QMortal {
       if (buildNextItem())
         mCounter++;
     } else if (mCounter == cLENGTH) {
-      if (buildTreeBuilder())
+      TreeSequenceTestParameters params;
+      if (!params.pATTACH_BUILDER || buildTreeBuilder()) {
+        getBond(0).breakup();
         die(); // done
+      }
     }
   }
 
