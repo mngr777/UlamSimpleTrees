@@ -22,7 +22,7 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   State mState = cSTATE_READY;
   TreeData.Arity mDownChildIndex = TreeData.Arity.maxof;
 
-  Void behave() {
+  @Override Void behave() {
     if (mState == cSTATE_READY) {
       attach();
     } else if (mState == cSTATE_REWINDING) {

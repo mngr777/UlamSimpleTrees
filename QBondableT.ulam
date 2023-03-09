@@ -26,19 +26,20 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
     if (!drawable.canDraw())
       return;
 
-    DebugUtils du;
-    EventWindow ew;
     for (QBond.Index i = 0u; i < cMAX_BOND_NUM; i++) {
       QBond& bond = mBonds[i];
       if (!bond.isBonded())
         continue;
 
+
+      EventWindow ew;
       C2D start;
       C2D end = ew.getCoordRaw(bond.mSite) * Drawable.cUNITS_PER_SITE / 2;
 
       ColorUtils cu;
       ARGB oncol = cu.color(0xffffffff);
-      ARGB offcol = cu.color(0xffffffff);
+      ARGB offcol = oncol;
+
       drawable.drawMaskedLine(start, end, oncol, offcol, 0xffffffff);
     }
   }

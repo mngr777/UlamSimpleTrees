@@ -12,6 +12,7 @@ element Tree : QBondableT(4u) + QDiffusableT(1000u, 2u) {
   constant QBond.Index cRIGHT = 3u;
 
   Datum mData = 0x0;
+  Datum mResult = 0x0;
 
   Datum getData() {
     return mData;
@@ -19,6 +20,14 @@ element Tree : QBondableT(4u) + QDiffusableT(1000u, 2u) {
 
   Void setData(Datum data) {
     mData = data;
+  }
+
+  Datum getResult(Datum data) {
+    return mResult;
+  }
+
+  Void setResult(Datum data) {
+    mResult = data;
   }
 
   Bool isRoot() {

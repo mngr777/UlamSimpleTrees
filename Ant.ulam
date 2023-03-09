@@ -1,0 +1,189 @@
+/**
+   Marks the starting position
+
+   \symbol AS
+   \color #888
+ */
+element AntStart {
+  C2D.Dir mDir;
+
+  @Override Void renderGraphics() {
+    Drawable drawable;
+    if (!drawable.canDraw())
+      return;
+
+    C2D start;
+    C2D end = start.neighbor(mDir) * Drawable.cUNITS_PER_SITE;
+
+    ColorUtils cu;
+    ARGB oncol = cu.color(0x00888888);
+    ARGB offcol = oncol;
+
+    drawable.drawMaskedLine(start, end, oncol, offcol, 0xffffffff);
+  }
+}
+
+/**
+   \symbol AF
+   \color #f92
+ */
+element AntFood {}
+
+/**
+   \color #ccc
+ */
+element Ant : QBondableT(2u) + QMortal {
+  typedef C2D.Dir Dir;
+
+  constant QBond.Index cTREE = 0u;
+  // constant QBond.Index cSTATE = 1u;
+
+  EventWindow ew;
+
+  Bool mIsOnTrail = false;
+  Bool mIsMoving = false;
+  Dir mDir = 2u; // east
+  Unsigned mEaten = 0u;
+
+  // Search spiral
+  Unsigned(5) mCount = 0u;
+  Unsigned(5) mSideLength = 1u;
+  Bool mSideFirst = true;
+
+  @Override Void behave() {
+    if (mIsMoving) {
+      swapForward();
+
+    } else if (!mIsOnTrail) {
+      search();
+
+    } else {
+      exec();
+    }
+  }
+
+  // NOTE: "on trail" flag is set in `swapForward`
+  // Right spiral:
+  // - move x sites forward
+  // - turn right
+  // - move x sites forward
+  // - increase x
+  // - repeat
+  Void search() {
+    if (mCount >= mSideLength)
+      return; // couldn't find the start, just sit here
+
+    // Set flag to move
+    forward();
+
+    // Update counters
+    mCount++;
+    if (mCount == mSideLength) {
+      if (!mSideFirst) {
+        // Increase side length or give up
+        if (mSideLength == Unsigned(5).maxof)
+          return; // get stuck
+        mSideLength++;
+      }
+      // Next side
+      right();
+      mCount = 0u;
+      mSideFirst = !mSideFirst;
+    }
+  }
+
+  Void exec() {
+    // TODO
+  }
+
+  Bool isFoodAhead() {
+    C2D coord = getForwardCoord();
+    if (!ew.isAccessible(coord))
+      return false;
+    return (ew[coord] is AntFood);
+  }
+
+  Void forward() {
+    mIsMoving = true; // retry
+  }
+
+  Void left() {
+    mDir = (Dir) (((Int) mDir + 6) % 8);
+  }
+
+  Void right() {
+    mDir = (Dir) (((Int) mDir + 2) % 8);
+  }
+
+  // NOTE: the ant is no longer at 0 after swapping,
+  // "self" reference won't work
+  Void swapForward() {
+    C2D coord = getForwardCoord();
+    if (!ew.isAccessible(coord))
+      return; // get stuck
+
+    // What is ahead?
+    Bool isNone = ew.isEmpty(coord);
+    Bool isFood = (ew[coord] is AntFood);
+    Bool isStart = (ew[coord] is AntStart);
+    Dir startDir = 0u;
+    if (isStart) {
+      AntStart& start = (AntStart&) ew[coord];
+      startDir = start.mDir;
+    }
+
+    // Can we move there?
+    if (!isNone && !(isFood && mIsOnTrail) && !(isStart && !mIsOnTrail))
+      return; // stuck unless this thing moves
+
+    // Save this to restore if needed
+    Atom atom = ew[coord]; // copy
+    Dir dir = mDir;
+
+    // Consume
+    if (isFood) {
+      mEaten++;
+    } else if (isStart) {
+      mIsOnTrail = true;
+      mDir = startDir;
+    }
+    Empty empty;
+    ew[coord] = empty;
+
+    // Move
+    mIsMoving = false;
+    SwapHelper sh;
+    if (!sh.swap(0u, ew.getSiteNumberRaw(coord))) {
+      // Probably can't move because of our bonds,
+      // undo everything
+      ew[0] = atom;
+      if (isFood) {
+        mEaten--;
+      } else if (isStart) {
+        mIsOnTrail = false;
+        mDir = dir;
+      }
+      mIsMoving = true; // retry later
+    }
+  }
+
+  C2D getForwardCoord() {
+    C2D origin;
+    return origin.neighbor(mDir);
+  }
+
+  @Override Void renderGraphics() {
+    Drawable drawable;
+    if (!drawable.canDraw())
+      return;
+
+    C2D start;
+    C2D end = start.neighbor(mDir) * (Drawable.cUNITS_PER_SITE * 3 / 4);
+
+    ColorUtils cu;
+    ARGB oncol = cu.color(0x00cccccc);
+    ARGB offcol = oncol;
+
+    drawable.drawMaskedLine(start, end, oncol, offcol, 0xffffffff);
+  }
+}
