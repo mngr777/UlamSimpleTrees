@@ -31,7 +31,6 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
       if (!bond.isBonded())
         continue;
 
-
       EventWindow ew;
       C2D start;
       C2D end = ew.getCoordRaw(bond.mSite) * Drawable.cUNITS_PER_SITE / 2;
