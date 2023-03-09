@@ -1,14 +1,3 @@
-transient AntTrailData {
-  typedef Unsigned(2) Move;
-  typedef Unsigned(6) Size;
-
-  constant Move cFORWARD = 0u;
-  constant Move cLEFT = 1u;
-  constant Move cRIGHT = 2u;
-  constant Move cPLACE = 3u; // move forward and place
-}
-
-
 /**
    \symbol AT
    \color #00f
@@ -162,6 +151,49 @@ element AntTrailPlacer: QMortal {
   }
 }
 
+
+transient AntSequenceData {
+  constant Unsigned cSIZE = 17u;
+
+  typedef Unsigned(3) Symbol;
+
+  constant Symbol cIS_FOOD_AHEAD = 0x1;
+  constant Symbol cFORWARD       = 0x2;
+  constant Symbol cLEFT          = 0x3;
+  constant Symbol cRIGHT         = 0x4;
+  constant Symbol cPROGN         = 0x5;
+
+  Symbol data[cSIZE] = {
+    cIS_FOOD_AHEAD,
+    /**/ cPROGN,
+    /*     */ cPROGN,
+    /*          */ cFORWARD,
+    /*          */ cFORWARD,
+    /*     */ cRIGHT,
+    /**/ cPROGN,
+    /*     */ cPROGN,
+    /*          */ cPROGN,
+    /*               */ cLEFT,
+    /*               */ cLEFT,
+    /*          */ cPROGN,
+    /*               */ cPROGN,
+    /*                    */ cFORWARD,
+    /*                    */ cFORWARD,
+    /*               */ cRIGHT,
+    /*     */ cRIGHT
+  };
+}
+
+
+transient AntTrailData {
+  typedef Unsigned(2) Move;
+  typedef Unsigned(6) Size;
+
+  constant Move cFORWARD = 0u;
+  constant Move cLEFT = 1u;
+  constant Move cRIGHT = 2u;
+  constant Move cPLACE = 3u; // move forward and place
+}
 
 transient AntTrailData0: AntTrailData {
   constant Size cSIZE = 32u;
