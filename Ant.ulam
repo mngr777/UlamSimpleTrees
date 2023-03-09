@@ -29,21 +29,34 @@ element AntStart {
  */
 element AntFood {}
 
+
+local typedef EventWindow.SiteNum SiteNum;
+local typedef DataUtils.Datum Datum;
+
 /**
    \color #ccc
  */
 element Ant : QBondableT(2u) + QMortal {
   typedef C2D.Dir Dir;
 
+  typedef TreeData.Symbol Symbol;
+  typedef TreeData.Arity Arity;
+  typedef TreeData.Type Type;
+  typedef TreeData.Byte Byte;
+
   constant QBond.Index cTREE = 0u;
   // constant QBond.Index cSTATE = 1u;
 
-  EventWindow ew;
+  constant Symbol cCONDITIONAL_IS_FOOD_AHEAD = 0x1;
+  constant Symbol cFUNCTION_FORWARD          = 0x2;
+  constant Symbol cFUNCTION_LEFT             = 0x3;
+  constant Symbol cFUNCTION_RIGHT            = 0x4;
+  constant Symbol cFUNCTION_PROGN            = 0x5;
 
   Bool mIsOnTrail = false;
   Bool mIsMoving = false;
   Dir mDir = 2u; // east
-  Unsigned mEaten = 0u;
+  Unsigned(8) mEaten = 0u;
 
   // Search spiral
   Unsigned(5) mCount = 0u;
@@ -63,6 +76,8 @@ element Ant : QBondableT(2u) + QMortal {
   }
 
   // NOTE: "on trail" flag is set in `swapForward`
+  // Hardcoded for now to keep things simple (this function requires state)
+  //
   // Right spiral:
   // - move x sites forward
   // - turn right
@@ -93,10 +108,185 @@ element Ant : QBondableT(2u) + QMortal {
   }
 
   Void exec() {
-    // TODO
+    BondUtils bu;
+    EventWindow ew;
+    TreeData td;
+
+    // Get the tree
+    QBond& treeBond = getBond(cTREE);
+    if (!treeBond.isBonded())
+      return; // no tree too execute
+    Tree& tree = (Tree&) ew[treeBond.getSiteNumber()];
+    Datum result = tree.getResult();
+
+    if (td.hasValue(result) && td.isFinal(result)) {
+      // The subtree is already evaluated
+      if (!tree.isRoot()) {
+        // Move up
+        if (bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON) == BondUtils.cSTATUS_OK) {
+          // Pass the result to parent (should be accessible)
+          Tree& parent = (Tree&) ew[treeBond.getSiteNumber()];
+          evalOrStoreArgument(parent, td.getValue(result));
+
+          // Unset value while we have the child in scope
+          result = td.setIsFinal(result, false);
+          result = td.unsValue(result);
+          tree.setResult(result);
+        }
+      }
+      // NOTE: if at ther root, wait for someone to consume the result (unset the value)
+
+    } else if (td.hasValue(result) && td.getType(result) == TreeData.cTYPE_CONDITIONAL) {
+      // Non-final result value for conditionals is selected branch number.
+      // (Conditionals don't need to store first argument, since they can have
+      // only one at most with one branch.)
+      Arity branch = (Arity) td.getValue(result);
+      if (branch == Arity.maxof) {
+        // done
+        result = td.setIsFinal(result, true);
+        result = td.setValue(result, TreeData.cNIL);
+      } else {
+        // Move to selected branch
+        QBond.Index index = (branch == 0u) ? Tree.cLEFT : Tree.cRIGHT;
+        bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
+      }
+
+    } else {
+      // Eval if there's enough arguments, or move to children
+      Arity argNumRequired = getArgNum(tree);
+      if (argNumRequired == 1u && td.hasValue(result)) {
+        eval(tree, td.getValue(result));
+
+      } else if (argNumRequired == 0u) {
+        eval(tree);
+
+      } else {
+        QBond.Index index = td.hasValue(result) ? Tree.cLEFT : Tree.cRIGHT;
+        bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
+      }
+    }
+  }
+
+  // NOTE:
+  // * assuming eval always succeeds, no need to store the 2nd argument to retry
+  // * also assume that arguments are always passed in correct order,
+  //   no parallel execution for now
+  Void evalOrStoreArgument(Tree& tree, Byte arg) {
+    TreeData td;
+
+    Arity argNumRequired = getArgNum(tree);
+    Datum result = tree.getResult();
+    Bool hasArg = td.hasValue(result);
+
+    if (argNumRequired > 1 && !hasArg) {
+      // Store as 1st argument
+      result = td.setIsFinal(result, false);
+      result = td.setValue(result, arg);
+      tree.setResult(result);
+
+    } else if (argNumRequired > 1) {
+      eval(tree, td.getValue(result), arg);
+
+    } else if (argNumRequired == 1 && !hasArg) {
+      eval(tree, arg);
+
+    } else  {
+      // Zero arguments required or one is required and one is already stored.
+      // This normally happens when branch selected by conditional returns,
+      // just store argument as final result
+      result = td.setIsFinal(result, true);
+      result = td.setValue(result, arg);
+      tree.setResult(result);
+    }
+  }
+
+  Void eval(Tree& tree) {
+    eval(tree, 0x0, 0x0);
+  }
+
+  Void eval(Tree& tree, Byte arg1) {
+    eval(tree, arg1, 0x0);
+  }
+
+  Void eval(Tree& tree, Byte arg1, Byte arg2) {
+    TreeData td;
+    Datum data = tree.getData();
+    Type type = td.getType(data);
+
+    if (type == TreeData.cTYPE_CONDITIONAL) {
+      evalConditional(tree, arg1, arg2);
+
+    } else if (type == TreeData.cTYPE_FUNCTION) {
+      evalFunction(tree, arg1, arg2);
+
+    } else {
+      // not implemented
+    }
+  }
+
+  Void evalConditional(Tree& tree, Byte arg1, Byte arg2) {
+    TreeData td;
+    Symbol symbol = td.getSymbol(tree.getData());
+
+    Bool ok = true;
+    Arity branch = 0u;
+    if (symbol == cCONDITIONAL_IS_FOOD_AHEAD) {
+      branch = isFoodAhead() ? 0u : 1u;
+    } else {
+      ok = false; // unknown symbol, hang up
+    }
+
+    // Store selected branch as result
+    if (ok) {
+      Datum result = tree.getResult();
+      result = td.setIsFinal(result, false);
+      result = td.setValue(result, branch);
+      tree.setResult(result);
+    }
+  }
+
+  Void evalFunction(Tree& tree, Byte arg1, Byte arg2) {
+    TreeData td;
+    Symbol symbol = td.getSymbol(tree.getData());
+
+    Bool ok = true;
+    if (symbol == cFUNCTION_FORWARD) {
+      forward();
+    } else if (symbol == cFUNCTION_LEFT) {
+      left();
+    } else if (symbol == cFUNCTION_RIGHT) {
+      right();
+    } else if (symbol == cFUNCTION_PROGN) {
+      // do nothing
+    } else {
+      ok = false; // unknown symbol, hang up
+    }
+
+    // Store null as result
+    if (ok) {
+      Datum result = tree.getResult();
+      result = td.setIsFinal(result, true);
+      result = td.setValue(result, TreeData.cNIL);
+      tree.setResult(result);
+    }
+  }
+
+  Arity getArgNum(Tree& tree) {
+    TreeData td;
+    Datum data = tree.getData();
+    return getArgNum(td.getType(data), td.getSymbol(data));
+  }
+
+  Arity getArgNum(Type type, Symbol symbol) {
+    if (type == TreeData.cTYPE_FUNCTION) {
+      if (symbol == cFUNCTION_PROGN)
+        return 2u;
+    }
+    return 0u;
   }
 
   Bool isFoodAhead() {
+    EventWindow ew;
     C2D coord = getForwardCoord();
     if (!ew.isAccessible(coord))
       return false;
@@ -108,16 +298,18 @@ element Ant : QBondableT(2u) + QMortal {
   }
 
   Void left() {
-    mDir = (Dir) (((Int) mDir + 6) % 8);
+    mDir = (Dir) (((Int) mDir + 2) % 8);
   }
 
   Void right() {
-    mDir = (Dir) (((Int) mDir + 2) % 8);
+    mDir = (Dir) (((Int) mDir + 6) % 8);
   }
 
   // NOTE: the ant is no longer at 0 after swapping,
   // "self" reference won't work
   Void swapForward() {
+    EventWindow ew;
+
     C2D coord = getForwardCoord();
     if (!ew.isAccessible(coord))
       return; // get stuck

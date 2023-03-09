@@ -1,4 +1,4 @@
-quark QBond : Fail {
+quark QBond {
   typedef EventWindow.SiteNum SiteNum;
   typedef Unsigned(6) Site;
   typedef Unsigned(3) Index;
@@ -127,15 +127,17 @@ quark QBond : Fail {
       return;
 
     EventWindow ew;
+    Fail fl;
+
     C2D coord = ew.getCoordRaw(site);
     C2D coordBonded = coord + getCoord();
     C2D coordOther = ew.getCoordRaw(siteOther);
 
     if (!ew.isAccessible(coord) || !ew.isAccessible(coordBonded) || !ew.isAccessible(coordOther))
-      fail("QBond.updateForSwap: some sites are inaccessible, check with QBond.checkForSwap before swapping");
+      fl.fail("QBond.updateForSwap: some sites are inaccessible, check with QBond.checkForSwap before swapping");
 
     if (coordBonded.manhattanDistance(coordOther) > cMAX_DIST)
-      fail("QBond.updateForSwap: can't swap without breaking a bond, check with QBond.checkForSwap before swapping");
+      fl.fail("QBond.updateForSwap: can't swap without breaking a bond, check with QBond.checkForSwap before swapping");
 
     Atom& bondable = ew[coordBonded];
     if (bondable as IBondable) {
@@ -153,7 +155,6 @@ quark QBond : Fail {
     } else {
       // DebugUtils du;
       // du.print("QBond.updateForSwap: other side of the bond is not bondable");
-      Fail fl;
       fl.fail("QBond.updateForSwap: other side of the bond is not bondable");
     }
   }

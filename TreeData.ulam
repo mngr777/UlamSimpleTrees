@@ -3,20 +3,101 @@ quark TreeData {
   typedef DataUtils.Byte Byte;
 
   typedef Unsigned(2) Arity;
+  typedef Unsigned(2) Type;
+  typedef Byte Symbol;
 
-  // arity
-  // v
-  // | 0 1 | 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+  constant Byte cNIL = 0x0;
+
+  constant Type cTYPE_FUNCTION = 0u;
+  constant Type cTYPE_CONDITIONAL = 1u;
+  constant Type cTYPE_CONSTANT = 2u;
+  constant Type cTYPE_STATE = 3u;
+
+  // Data
+  // arity  type unused     symbol/constant/state ref/...
+  //   v     v     v          v
+  // | 0 1 | 2 3 | 4 5 6 | 7 | 0 1 2 3 4 5 6 7
+  //                       ^
+  //                      has value?
+  //
   constant Byte cARITY_MASK = 0b11000000;
+  constant Unsigned cARITY_SHIFT = 6u;
+  constant Byte cTYPE_MASK = 0b00110000;
+  constant Unsigned cTYPE_SHIFT = 4u;
+
+  // Result
+  // (either final result or 1st argument)
+  //
+  //  unused       final?  value
+  //   v             v       v
+  // | 0 1 2 3 4 5 | 6 | 7 | 0 1 2 3 4 5 6 7
+  //                     ^
+  //                    has value?
+  //
+  constant Byte cIS_FINAL_MASK = 0b00000010;
+  constant Unsigned cIS_FINAL_SHIFT = 1u;
+
+  // Common
+  constant Byte cHAS_VALUE_MASK = 0b00000001;
+  constant Unsigned cHAS_VALUE_SHIFT = 0u;
 
   DataUtils dd;
 
+  // Data
+
   Arity getArity(Datum datum) {
-    return (Arity) ((dd.getHi(datum) & cARITY_MASK) >> 6);
+    return (Arity) dd.getHi(datum, cARITY_MASK, cARITY_SHIFT);
   }
 
   Datum setArity(Datum datum, Arity arity) {
-    Byte hi = dd.getHi(datum) & cARITY_MASK | (Byte) (arity << 6);
-    return dd.setHi(datum, hi);
+    return dd.setHi(datum, arity, cARITY_MASK, cARITY_SHIFT);
+  }
+
+  Type getType(Datum datum) {
+    return (Type) dd.getHi(datum, cTYPE_MASK, cTYPE_SHIFT);
+  }
+
+  Datum setType(Datum datum, Type type) {
+    return dd.setHi(datum, type, cTYPE_MASK, cTYPE_SHIFT);
+  }
+
+  Symbol getSymbol(Datum datum) {
+    return dd.getLo(datum);
+  }
+
+  Datum setSymbol(Datum datum, Symbol symbol) {
+    return dd.setLo(datum, symbol);
+  }
+
+  // Result
+
+  Bool isFinal(Datum result) {
+    return (Bool) dd.getHi(result, cIS_FINAL_MASK, cIS_FINAL_SHIFT);
+  }
+
+  Datum setIsFinal(Datum result, Bool isFinal) {
+    return dd.setHi(result, (Byte) isFinal);
+  }
+
+  // Common
+
+  Bool hasValue(Datum result) {
+    return (Bool) dd.getHi(result, cHAS_VALUE_MASK, cHAS_VALUE_SHIFT);
+  }
+
+  Byte getValue(Datum datum) {
+    return dd.getLo(datum);
+  }
+
+  Datum setValue(Datum datum, Byte value) {
+    datum = dd.setLo(datum, value);
+    datum = dd.setHi(datum, 0x1, cHAS_VALUE_MASK, cHAS_VALUE_SHIFT);
+    return datum;
+  }
+
+  Datum unsValue(Datum datum) {
+    datum = dd.setLo(datum, TreeData.cNIL);
+    datum = dd.setHi(datum, 0x0, cHAS_VALUE_MASK, cHAS_VALUE_SHIFT);
+    return datum;
   }
 }

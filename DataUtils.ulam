@@ -6,6 +6,7 @@ quark DataUtils {
     return (Datum)((Datum) hi << 8 | lo);
   }
 
+
   Byte getHi(Datum datum) {
     return (Byte) (datum >> 8);
   }
@@ -20,5 +21,33 @@ quark DataUtils {
 
   Datum setLo(Datum datum, Byte lo) {
     return datum & 0xff00 | lo;
+  }
+
+
+  Byte getHi(Datum datum, Byte mask, Unsigned shift) {
+    return getFromByte(getHi(datum), mask, shift);
+  }
+
+  Datum setHi(Datum datum, Byte value, Byte mask, Unsigned shift) {
+    Byte hi = setToByte(getHi(datum), value, mask, shift);
+    return setHi(datum, hi);
+  }
+
+  Byte getLo(Datum datum, Byte mask, Unsigned shift) {
+    return getFromByte(getLo(datum), mask, shift);
+  }
+
+  Datum setLo(Datum datum, Byte value, Byte mask, Unsigned shift) {
+    Byte lo = setToByte(getLo(datum), value, mask, shift);
+    return setLo(datum, lo);
+  }
+
+
+  Byte getFromByte(Byte byte, Byte mask, Unsigned shift) {
+    return (Byte) (byte & mask) >> shift;
+  }
+
+  Byte setToByte(Byte byte, Byte value, Byte mask, Unsigned shift) {
+    return (Byte) ((byte & ~mask) | ((value << shift) & mask));
   }
 }

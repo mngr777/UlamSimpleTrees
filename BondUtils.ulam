@@ -20,6 +20,10 @@ quark BondUtils + Fail {
     return traverse(0u, index, indexNext, indexBond);
   }
 
+  /**
+     Detach bondable from currently attached and re-attach to next item
+     in a sequence. All three atoms must be accessible (at least) to succeed.
+   */
   Status traverse(SiteNum site, Index index, Index indexNext, Index indexBond) {
     if (!ew.isAccessible(site))
       return cSTATUS_INACCESSIBLE;

@@ -22,7 +22,7 @@ element Tree : QBondableT(4u) + QDiffusableT(1000u, 2u) {
     mData = data;
   }
 
-  Datum getResult(Datum data) {
+  Datum getResult() {
     return mResult;
   }
 
