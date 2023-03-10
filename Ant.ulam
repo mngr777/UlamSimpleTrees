@@ -189,7 +189,7 @@ element Ant : QBondable2 + QMortal {
         eval(tree);
 
       } else {
-        QBond.Index index = td.hasValue(result) ? Tree.cLEFT : Tree.cRIGHT;
+        QBond.Index index = td.hasValue(result) ? Tree.cRIGHT : Tree.cLEFT;
         bu.traverse(cTREE, index, Tree.cCOMMON);
       }
     }
@@ -328,8 +328,6 @@ element Ant : QBondable2 + QMortal {
   Bool isFoodAhead() {
     EventWindow ew;
     C2D coord = getForwardCoord();
-    if (!ew.isAccessible(coord))
-      return false;
     return (ew[coord] is AntFood);
   }
 

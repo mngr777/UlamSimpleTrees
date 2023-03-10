@@ -2,7 +2,8 @@ local typedef EventWindow.SiteNum SiteNum;
 
 quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radius cDIFFUSION_RADIUS): IDiffusable {
 
-  constant Diffusability cCOMPLETE_DIFFUSABILITY = 10000u;
+  // constant Diffusability cCOMPLETE_DIFFUSABILITY = 10000u;
+  constant Diffusability cCOMPLETE_DIFFUSABILITY = 1000u;
 
   @Override Diffusability getDiffusability() {
     return cDIFFUSABILITY;
@@ -17,17 +18,17 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
     if (getDiffusability() == 0u || getDiffusionRadius() == 0u)
       return;
 
-    // Get random site
-    WindowServices ws;
-    ws.reset(1u, getDiffusionRadius());
-    ws.scan(WindowServices.cALL_SITES_HIT);
-    if (ws.getHits() == 0u)
-      return;
-    SiteNum site = ws.getPick();
-
-    // Swap with some probability
     EventWindow ew;
     Random random;
+
+    // Get random site
+    SiteNum site = (ew[0] is IBondable)
+      ? getBondableDiffusionSite()
+      : getDiffusionSite();
+    if (site == SiteNum.maxof)
+      return;
+
+    // Swap with some probability
     Diffusability d = 0u;
     if (ew.isEmpty(site)) {
       d = getDiffusability();
@@ -47,5 +48,54 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
       SwapHelper sh;
       sh.swap(0, site);
     }
+  }
+
+  SiteNum getDiffusionSite() {
+    WindowServices ws;
+    ws.reset(1u, getDiffusionRadius());
+    ws.scan(WindowServices.cALL_SITES_HIT);
+    return ws.getPick();
+  }
+
+  SiteNum getBondableDiffusionSite() {
+    EventWindow ew;
+
+    // Collect coordinates of attached non-diffusable atoms
+
+    IBondable& bondable = (IBondable&) ew[0];
+
+    C2D staticCoords[QBond.Index.maxof];
+    Unsigned staticCoordNum = 0u;
+
+    for (QBond.Index i = 0u; i < bondable.getBondNum(); i++) {
+      QBond& bond = bondable.getBond(i);
+      C2D coord = bond.getCoord();
+      if (!ew.isEmpty(coord) && !(ew[coord] is IDiffusable))
+        staticCoords[staticCoordNum++] = coord;
+    }
+
+    if (staticCoordNum == 0u)
+      return getDiffusionSite();
+
+    // Make sites near collected coordinates more attractive
+    // TODO: try different parameters
+
+    WindowServices ws;
+    ws.reset(1u, getDiffusionRadius());
+    for (Int s = ws.next(); s >= 0; s = ws.next()) {
+      SiteNum site = (SiteNum) s;
+      C2D coord = ew.getCoordRaw(site);
+
+      Unsigned weight = 1u;
+      for (Unsigned i = 0u; i < staticCoordNum; i++) {
+        Unsigned dist = coord.manhattanDistance(staticCoords[i]);
+        if (0u < dist && dist <= 2u) {
+          weight = 2u;
+          break;
+        }
+      }
+      ws.hit(0u, weight);
+    }
+    return ws.getPick();
   }
 }

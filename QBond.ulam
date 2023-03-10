@@ -3,7 +3,9 @@ quark QBond {
   typedef Unsigned(6) Site;
   typedef Unsigned(3) Index;
 
-  constant Unsigned(3) cMAX_DIST = 4u;
+  constant Unsigned(3) cMAX_NUM = 4u;
+  // constant Unsigned(3) cMAX_DIST = 3u;
+  constant Unsigned(3) cMAX_DIST = 3u;
 
   Site mSite = 0u;
   Index mIndex;

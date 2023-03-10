@@ -327,23 +327,23 @@ transient AntSequenceData {
 
   // Actual solution
   Symbol data[cSIZE] = {
-    cIF_FOOD_AHEAD,
-    /**/ cPROGN,
+    /* */ cIF_FOOD_AHEAD,
+    /*   */ cPROGN,
+    /*     */ cFORWARD,
     /*     */ cPROGN,
-    /*          */ cFORWARD,
-    /*          */ cFORWARD,
-    /*     */ cRIGHT,
-    /**/ cPROGN,
+    /*       */ cFORWARD,
+    /*       */ cRIGHT,
+    /*   */ cPROGN,
     /*     */ cPROGN,
-    /*          */ cPROGN,
-    /*               */ cLEFT,
-    /*               */ cLEFT,
-    /*          */ cPROGN,
-    /*               */ cPROGN,
-    /*                    */ cFORWARD,
-    /*                    */ cFORWARD,
-    /*               */ cRIGHT,
-    /*     */ cRIGHT
+    /*       */ cPROGN,
+    /*         */ cLEFT,
+    /*         */ cPROGN,
+    /*           */ cFORWARD,
+    /*           */ cLEFT,
+    /*     */ cIF_FOOD_AHEAD,
+    /*       */ cFORWARD,
+    /*       */ cRIGHT,
+    /*   */ cRIGHT
   };
 }
 
