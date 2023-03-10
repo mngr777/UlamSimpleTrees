@@ -39,34 +39,34 @@ quark QBond {
       return false;
 
     EventWindow ew;
+    Fail fl;
 
     if (!ew.isAccessible(site) || !ew.isAccessible(siteOther))
       return false;
+
+    if (!(ew[site] is IBondable)) {
+      fl.fail("QBond.bond: atom is not bondable");
+    } else if (!(ew[siteOther] is IBondable)) {
+      fl.fail("QBond.bond: the other atom is not bondable");
+    }
 
     C2D coord = ew.getCoordRaw(site);
     C2D coordOther = ew.getCoordRaw(siteOther);
     if (coord.manhattanDistance(coordOther) > cMAX_DIST)
       return false;
 
-    Atom& bondable = ew[siteOther];
-    if (bondable as IBondable) {
-      QBond& bondOther = bondable.getBond(indexOther);
-      if (bondOther.isBonded())
-        return false; // the other end is already bonded
+    IBondable& bondable = (IBondable&) ew[siteOther];
+    QBond& bondOther = bondable.getBond(indexOther);
+    if (bondOther.isBonded())
+      return false; // the other end is already bonded
 
-      C2D diff = coordOther - coord;
-      mSite = (Site) ew.getSiteNumber(diff);
-      mIndex = indexOther;
-      bondOther.mSite = (Site) ew.getSiteNumber(-diff);
-      bondOther.mIndex = index;
+    C2D diff = coordOther - coord;
+    mSite = (Site) ew.getSiteNumber(diff);
+    mIndex = indexOther;
+    bondOther.mSite = (Site) ew.getSiteNumber(-diff);
+    bondOther.mIndex = index;
 
-      return true;
-
-    } else {
-      DebugUtils du;
-      du.print("QBond.bond: the other atom is not bondable");
-    }
-    return false;
+    return true;
   }
 
   Bool breakup() {

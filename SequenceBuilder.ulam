@@ -1,0 +1,60 @@
+local typedef EventWindow.SiteNum SiteNum;
+
+quark SequenceBuilder {
+  typedef TreeData.Datum Datum;
+  typedef QBond.Index Index;
+
+  Bool buildNext(Atom& builder, Datum data, Index index) {
+    BondUtils bu;
+    DebugUtils du;
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    IBondable& bondable = (IBondable&) builder;
+    QBond& bond = bondable.getBond(index);
+    SiteNum site = ew.getSiteNumber(builder);
+
+    // Find a site to build at
+    // SiteNum nextSite = ewm.findEmptySiteAround(builder, 1u, QBond.cMAX_DIST);
+    SiteNum nextSite = ewm.findEmptySiteAround(builder, 1u, QBond.cMAX_DIST);
+    if (nextSite == SiteNum.maxof)
+      return false;
+
+    // Build
+    Sequence seq;
+    seq.setData(data);
+    ew[nextSite] = seq;
+    Sequence& next = (Sequence&) ew[nextSite];
+
+    if (bond.isBonded()) {
+      // Bond to previous item
+      QBond& prevBond = next.getBond(Sequence.cPREV);
+      if (!prevBond.bond(nextSite, Sequence.cPREV, bond.getSiteNumber(), Sequence.cNEXT)) {
+        // This is normal, most likely the atoms are just too far apart, retry later
+        // cleanup
+        Empty empty;
+        ew[nextSite] = empty;
+        return false;
+      }
+
+      // Re-attach the builder to next item
+      // this shouldn't fail since all atoms are within the window
+      // and nothing is attached to the new item
+      if (bu.traverse(site, index, Sequence.cNEXT, Sequence.cCOMMON) != BondUtils.cSTATUS_OK) {
+        Fail fl;
+        fl.fail("SequenceBuilder.buildNext: failed to traverse to next item");
+      }
+
+    } else {
+      // First item, bond to the builder
+      if (!bond.bond(site, index, nextSite, Sequence.cCOMMON)) {
+        du.print("SequenceBuilder.buildNex: failed to bond to first item");
+        // cleanup
+        Empty empty;
+        ew[nextSite] = empty;
+        return false;
+      }
+    }
+    return true;
+  }
+}

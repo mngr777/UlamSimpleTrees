@@ -62,11 +62,11 @@ quark TreeData {
   }
 
   Symbol getSymbol(Datum datum) {
-    return dd.getLo(datum);
+    return getValue(datum);
   }
 
   Datum setSymbol(Datum datum, Symbol symbol) {
-    return dd.setLo(datum, symbol);
+    return setValue(datum, symbol);
   }
 
   // Result
@@ -76,7 +76,7 @@ quark TreeData {
   }
 
   Datum setIsFinal(Datum result, Bool isFinal) {
-    return dd.setHi(result, (Byte) isFinal);
+    return dd.setHi(result, (Byte) isFinal, cIS_FINAL_MASK, cIS_FINAL_SHIFT);
   }
 
   // Common

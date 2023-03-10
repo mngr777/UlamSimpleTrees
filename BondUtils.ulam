@@ -2,7 +2,7 @@ quark BondUtils + Fail {
   typedef EventWindow.SiteNum SiteNum;
   typedef QBond.Index Index;
 
-  typedef Unsigned Status;
+  typedef Unsigned(4) Status;
 
   constant Status cSTATUS_OK              = 0u;
   constant Status cSTATUS_INACCESSIBLE    = 1u;
@@ -11,10 +11,128 @@ quark BondUtils + Fail {
   constant Status cSTATUS_NO_NEXT         = 4u;
   constant Status cSTATUS_ALREADY_BONDED  = 5u;
   constant Status cSTATUS_CANNOT_DETACH   = 6u;
-  constant Status cSTATUS_CANNOT_REATTACH = 7u; // fail
+  constant Status cSTATUS_CANNOT_ATTACH   = 7u;
+  constant Status cSTATUS_CANNOT_REATTACH = 8u; // fail
 
   DebugUtils du;
   EventWindow ew;
+
+  // TODO:
+  // * DRY;
+  // * make last "new bond index" arguments optional instead of object site:
+  //   passing zero for self is easier;
+  // * Use status checking functions
+
+  IBondable& getBondable(SiteNum site) {
+    checkIsBondable(site);
+    return (IBondable&) ew[site];
+  }
+
+  Void checkIsBondable(SiteNum site) {
+    if (!ew[site] is IBondable)
+      fail("BondUtils: atom is not IBondable");
+  }
+
+
+  Bool isOk(Status status) {
+    return (status == cSTATUS_OK);
+  }
+
+  Bool isError(Status status) {
+    return !isOk(status) && !canRetry(status);
+  }
+
+  Bool canRetry(Status status) {
+    return (status == cSTATUS_INACCESSIBLE)
+      || (status == cSTATUS_CANNOT_ATTACH)
+      || (status == cSTATUS_CANNOT_DETACH);
+  }
+
+
+  Status replace(Index index, SiteNum subSite, Index subIndex, Index bondIndex) {
+    return replace(0u, index, subSite, subIndex, bondIndex);
+  }
+
+  Status replace(SiteNum site, Index index, SiteNum subSite, Index subIndex, Index bondIndex) {
+    if (!ew.isAccessible(site) || !ew.isAccessible(subSite))
+      return cSTATUS_INACCESSIBLE;
+
+    checkIsBondable(subSite);
+
+    // Get bonds
+    IBondable& obj = getBondable(site);
+    QBond& bond = obj.getBond(index);
+    QBond& subBond = obj.getBond(bondIndex); // use this bond to attach to substitute
+    if (!bond.isBonded())
+      return cSTATUS_NOT_BONDED; // or just attach anyway?
+    if (bondIndex != index && subBond.isBonded())
+      return cSTATUS_ALREADY_BONDED;
+
+    // Get attachedly attached atom
+    C2D attachedCoord = ew.getCoordRaw(site) + bond.getCoord();
+    SiteNum attachedSite = ew.getSiteNumberRaw(attachedCoord);
+    Index attachedIndex = bond.getIndex(); // in case we need to re-attach
+    if (!ew.isAccessible(attachedCoord))
+      return cSTATUS_INACCESSIBLE;
+    IBondable& attached = getBondable(attachedSite);
+
+    // Detach
+    if (!bond.breakup(site))
+      return cSTATUS_CANNOT_DETACH;
+
+    // Attach to sub
+    if (!subBond.bond(site, bondIndex, subSite, subIndex)) {
+      if (!bond.bond(site, index, attachedSite, attachedIndex)) {
+        fail("BondUtils.replace: failed to re-attach");
+        return cSTATUS_CANNOT_REATTACH;
+      }
+      return cSTATUS_CANNOT_ATTACH;
+    }
+    return cSTATUS_OK;
+  }
+
+
+  Status transfer(Index index, SiteNum toSite, Index toIndex) {
+    return transfer(0u, index, toSite, toIndex);
+  }
+
+  // UNTESTED
+  Status transfer(SiteNum site, Index index, SiteNum toSite, Index toIndex) {
+    if (!ew.isAccessible(site) || !ew.isAccessible(toSite))
+      return cSTATUS_INACCESSIBLE;
+
+    checkIsBondable(toSite);
+
+    // Get bond
+    IBondable& obj = getBondable(site);
+    QBond& bond = obj.getBond(index);
+    if (!bond.isBonded())
+      return cSTATUS_NOT_BONDED; // or just attach anyway?
+
+    // Get attached atom
+    C2D fromCoord = ew.getCoordRaw(site) + bond.getCoord();
+    Index fromIndex = bond.getIndex(); // store in case we need to re-attach
+    if (!ew.isAccessible(fromCoord))
+      return cSTATUS_INACCESSIBLE;
+    IBondable& from = getBondable(ew.getSiteNumberRaw(fromCoord));
+
+    // Detach
+    if (!bond.breakup())
+      return cSTATUS_CANNOT_DETACH;
+
+    // Attach to target
+    if (!bond.bond(site, index, toSite, toIndex)) {
+      // Try to re-attach
+      SiteNum fromSite = ew.getSiteNumberRaw(fromCoord);
+      if (!bond.bond(site, index, fromSite, fromIndex)) {
+        fail("BondUtils.transfer: failed to re-attach");
+        return cSTATUS_CANNOT_REATTACH;
+      }
+      return cSTATUS_CANNOT_ATTACH;
+    }
+    return cSTATUS_OK;
+  }
+
 
   Status traverse(Index index, Index indexNext, Index indexBond) {
     return traverse(0u, index, indexNext, indexBond);
@@ -31,12 +149,12 @@ quark BondUtils + Fail {
     // Get atom
     if (!(ew[site] is IBondable)) {
       fail("BondUtils.traverse: atom is not IBondable");
-      return cSTATUS_INACCESSIBLE;
+      return cSTATUS_NOT_BONDABLE;
     }
     IBondable& obj = (IBondable&) ew[site];
     QBond& bond = obj.getBond(index);
     if (!bond.isBonded())
-      return cSTATUS_NOT_BONDED; // atom is not bonded to anything
+      return cSTATUS_NOT_BONDED;
 
     // Get coordinates of attached item
     C2D coord = ew.getCoordRaw(site);
@@ -45,7 +163,7 @@ quark BondUtils + Fail {
       return cSTATUS_INACCESSIBLE;
 
     // Get attached item
-    if (!ew[coordItem] is IBondable) {
+    if (!(ew[coordItem] is IBondable)) {
       fail("BondUtils.traverse: attached atom is not IBondable");
       return cSTATUS_NOT_BONDABLE;
     }
@@ -86,8 +204,8 @@ quark BondUtils + Fail {
         fail("BondUtils.traverse: failed to re-attach");
         return cSTATUS_CANNOT_REATTACH;
       }
+      return cSTATUS_CANNOT_ATTACH;
     }
-
     return cSTATUS_OK;
   }
 }

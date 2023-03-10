@@ -2,8 +2,156 @@
    \symbol AT
    \color #00f
  */
-element AntTest {
+element AntTest : QBondableT(1u) + QMortal {
+  typedef TreeData.Datum Datum;
+  typedef TreeData.Symbol Symbol;
+  typedef TreeData.Type Type;
+  typedef TreeData.Arity Arity;
 
+  constant QBond.Index cSEQUENCE = 0u;
+
+  Unsigned mCount = 0u;
+
+  @Override Void behave() {
+    EventWindow ew;
+
+    if (mCount < AntSequenceData.cSIZE) {
+      // Build next sequence item
+      AntSequenceData data;
+      SequenceBuilder builder;
+      Datum datum = prepareSeqData(data.data[mCount]);
+      if (builder.buildNext(ew[0], datum, cSEQUENCE))
+        mCount++;
+
+    } else {
+      // Attach the builder
+
+      BondUtils bu;
+      EventWindowMisc ewm;
+
+      SiteNum site = ewm.findEmptySite(QBond.cMAX_DIST);
+      if (site == SiteNum.maxof)
+        return;
+
+      AntTreeBuilder builder;
+      ew[site] = builder;
+
+      QBond& seqBond = getBond(cSEQUENCE); // assuming always attached
+      SiteNum seqSite = seqBond.getSiteNumber();
+
+      // Replace oursleves with the builder
+      BondUtils.Status status = bu.replace(seqSite, Sequence.cCOMMON, site, AntTreeBuilder.cSEQUENCE, Sequence.cCOMMON);
+      if (!bu.isOk(status)) {
+        // cleanup
+        Empty empty;
+        ew[site] = empty;
+        return;
+      }
+
+      die(); // done
+    }
+  }
+
+  Datum prepareSeqData(Symbol symbol) {
+    TreeData td;
+    Datum datum = 0x0;
+
+    Type type = TreeData.cTYPE_FUNCTION;
+    if (symbol == Ant.cCONDITIONAL_IF_FOOD_AHEAD)
+      type = TreeData.cTYPE_CONDITIONAL;
+
+    Arity arity = 0u;
+    if (symbol == Ant.cCONDITIONAL_IF_FOOD_AHEAD ||
+        symbol == Ant.cFUNCTION_PROGN)
+    {
+      arity = 2u;
+    }
+
+    datum = td.setArity(datum, arity);
+    datum = td.setType(datum, type);
+    datum = td.setSymbol(datum, symbol);
+
+    return datum;
+  }
+}
+
+
+/**
+   \symbol AB
+   \color #fff
+ */
+element AntTreeBuilder : QTreeBuilder + QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
+  typedef EventWindow.SiteNum SiteNum;
+
+  constant State cSTATE_PLACING_TRAIL = cSTATE_DONE_BUILDING; // alias
+  constant State cSTATE_PLACING_ANT = cSTATE_FIRST_UNRESERVED;
+  constant State cSTATE_DONE = cSTATE_PLACING_ANT + 1u;
+
+  @Override IBondable& getBondable() {
+    return self;
+  }
+
+  @Override Void behave() {
+    step();
+
+    if (mState == cSTATE_DONE || mState == cSTATE_ERROR) {
+      getBond(cSEQUENCE).breakup();
+      getBond(cTREE).breakup();
+      die();
+
+    } else if (getState() < cSTATE_PLACING_TRAIL) { // stand still when placing stuff
+      diffuse();
+    }
+  }
+
+  Void step() {
+    self.QTreeBuilder.step();
+    if (getState() == cSTATE_PLACING_TRAIL) {
+      placeTrail();
+    } else if (getState() == cSTATE_PLACING_ANT) {
+      placeAnt();
+    }
+  }
+
+  Void placeTrail() {
+    EventWindow ew;
+
+    C2D startCoord(2, 0);
+    if (!ew.isEmpty(startCoord))
+      return;
+
+    // Start building the trail
+    AntTestTrailBuilder builder;
+    ew[startCoord] = builder;
+
+    setState(cSTATE_PLACING_ANT);
+  }
+
+  Void placeAnt() {
+    BondUtils bu;
+    EventWindow ew;
+
+    C2D coord(1, 0);
+    SiteNum site = ew.getSiteNumber(coord);
+    if (!ew.isEmpty(site))
+      return;
+
+    Ant ant;
+    ew[site] = ant;
+
+    // Replace ourselves with the ant
+    QBond& treeBond = getBond(cTREE); // assuming always attached
+    SiteNum treeSite = treeBond.getSiteNumber();
+    BondUtils.Status status = bu.replace(treeSite, Tree.cCOMMON, site, Ant.cTREE, Tree.cCOMMON);
+    if (!bu.isOk(status)) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return;
+    }
+
+    setState(cSTATE_DONE);
+  }
 }
 
 
@@ -11,7 +159,7 @@ element AntTest {
    \symbol AP
    \color #f30
  */
-element AntTrailPlacer: QMortal {
+element AntTestTrailBuilder : QMortal {
   typedef AntTrailData.Move Move;
   typedef C2D.Dir Dir;
 
@@ -24,6 +172,7 @@ element AntTrailPlacer: QMortal {
   Bool mIsMoving = false;
   Bool mIsPlacing = false;
   Bool mPlaceAfterMove = false;
+  Bool mIsFirstMove = true;
 
   @Override Void behave() {
     if (mIsMoving) {
@@ -119,14 +268,21 @@ element AntTrailPlacer: QMortal {
     if (!ew.isEmpty(coord))
       return;
 
-    if (mIsPlacing) {
+    if (mIsFirstMove) {
+      AntTrailStart start;
+      ew[coord] = start;
+      mIsFirstMove = false;
+
+    } else if (mIsPlacing) {
       AntFood food;
       ew[coord] = food;
     }
+
     mIsMoving = false;
     mIsPlacing = mPlaceAfterMove;
     mPlaceAfterMove = false;
     ew.swap(0, ew.getSiteNumberRaw(coord));
+
 
   }
 
@@ -153,18 +309,25 @@ element AntTrailPlacer: QMortal {
 
 
 transient AntSequenceData {
+  // constant Unsigned cSIZE = 5u;
   constant Unsigned cSIZE = 17u;
 
   typedef Unsigned(3) Symbol;
 
-  constant Symbol cIS_FOOD_AHEAD = 0x1;
+  constant Symbol cIF_FOOD_AHEAD = 0x1;
   constant Symbol cFORWARD       = 0x2;
   constant Symbol cLEFT          = 0x3;
   constant Symbol cRIGHT         = 0x4;
   constant Symbol cPROGN         = 0x5;
 
+  // Symbol data[cSIZE] = {
+  //   cIF_FOOD_AHEAD,
+  //   cFORWARD,
+  //   cPROGN, cLEFT, cFORWARD};
+
+  // Actual solution
   Symbol data[cSIZE] = {
-    cIS_FOOD_AHEAD,
+    cIF_FOOD_AHEAD,
     /**/ cPROGN,
     /*     */ cPROGN,
     /*          */ cFORWARD,
@@ -195,7 +358,10 @@ transient AntTrailData {
   constant Move cPLACE = 3u; // move forward and place
 }
 
-transient AntTrailData0: AntTrailData {
+
+// Santa Fe ant trail packaged into multiple transients:
+
+transient AntTrailData0 : AntTrailData {
   constant Size cSIZE = 32u;
   /*
       (1)
@@ -227,7 +393,7 @@ transient AntTrailData0: AntTrailData {
   };
 }
 
-transient AntTrailData1: AntTrailData {
+transient AntTrailData1 : AntTrailData {
   constant Size cSIZE = 27u;
   /*
                   v

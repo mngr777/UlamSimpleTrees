@@ -12,8 +12,33 @@ quark EventWindowMisc {
     WindowServices ws;
     ws.reset(first, last);
     ws.scan(WindowServices.cEMPTY_SITES_HIT);
-    if (ws.getHits() == 0u)
-      return SiteNum.maxof;
+    return ws.getPick();
+  }
+
+  SiteNum findEmptySiteAround(Atom& atom, Radius first, Radius last) {
+    return findEmptySiteAround(ew.getSiteNumber(atom), first, last);
+  }
+
+  SiteNum findEmptySiteAround(SiteNum site, Radius first, Radius last) {
+    return findEmptySiteAround(ew.getCoordRaw(site), first, last);
+  }
+
+  SiteNum findEmptySiteAround(C2D coord, Radius first, Radius last) {
+    if (coord.isOrigin())
+      return findEmptySite(first, last);
+
+    WindowServices ws;
+    ws.reset(0u, 4u); // scan through all window sites
+    for (Int s = ws.next(); s >= 0; s = ws.next()) {
+      SiteNum site = (SiteNum) s;
+      if (!ew.isEmpty(site))
+        continue;
+
+      C2D siteCoord = ew.getCoordRaw(site);
+      Unsigned dist = coord.manhattanDistance(siteCoord);
+      if (first <= dist && dist <= last)
+        ws.hit();
+    }
     return ws.getPick();
   }
 }

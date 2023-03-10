@@ -2,6 +2,14 @@ quark QMortal {
   // NOTE: no killing allowed, only suicide
   Void die() {
     EventWindow ew;
+
+    // // Detach all bonds
+    // Atom& atom = ew[0];
+    // if (atom as IBondable) {
+    //   for (QBond.Index i = 0u; i < atom.getBondNum(); i++)
+    //     atom.getBond(i).breakup(0u);
+    // }
+
     Empty empty;
     ew[0] = empty;
   }

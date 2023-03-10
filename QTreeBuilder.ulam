@@ -1,38 +1,33 @@
 local typedef BondUtils BU;
 
-// TODO: inherit from  QTreeBuilder
-
-/**
-    \symbol TB
-    \symmetry all
- */
-element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
-  typedef Unsigned(3) State;
+quark QTreeBuilder {
+  typedef EventWindow.SiteNum SiteNum;
+  typedef Unsigned(4) State;
 
   constant QBond.Index cSEQUENCE = 0u;
   constant QBond.Index cTREE = 1u;
 
-  constant State cSTATE_READY       = 0u;
-  constant State cSTATE_REWINDING   = 1u;
-  constant State cSTATE_BUILDING    = 2u;
-  constant State cSTATE_ADVANCING   = 3u;
-  constant State cSTATE_MOVING_UP   = 4u;
-  constant State cSTATE_MOVING_DOWN = 5u;
-  constant State cSTATE_DONE        = 6u;
-  constant State cSTATE_ERROR       = 7u;
+  constant State cSTATE_READY            = 0u;
+  constant State cSTATE_REWINDING        = 1u;
+  constant State cSTATE_BUILDING         = 2u;
+  constant State cSTATE_ADVANCING        = 3u;
+  constant State cSTATE_MOVING_UP        = 4u;
+  constant State cSTATE_MOVING_DOWN      = 5u;
+  constant State cSTATE_DONE_BUILDING    = 6u;
+  constant State cSTATE_ERROR            = 7u;
+  constant State cSTATE_FIRST_UNRESERVED = cSTATE_ERROR + 1;
 
   State mState = cSTATE_READY;
   TreeData.Arity mDownChildIndex = TreeData.Arity.maxof;
 
-  @Override Void behave() {
-    step();
-    if (mState == cSTATE_DONE || mState == cSTATE_ERROR) {
-      getBond(cSEQUENCE).breakup();
-      getBond(cTREE).breakup();
-      die();
-    } else {
-      diffuse();
-    }
+  virtual IBondable& getBondable();
+
+  State getState() {
+      return mState;
+  }
+
+  Void setState(State state) {
+    mState = state;
   }
 
   Void step() {
@@ -52,8 +47,10 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   }
 
   Void attach() {
+    IBondable& bondable = getBondable();
+
     // Check if already attached from somewhere else
-    if (getBond(cSEQUENCE).isBonded()) {
+    if (bondable.getBond(cSEQUENCE).isBonded()) {
       mState = cSTATE_REWINDING; // go to the beginning
       return;
     }
@@ -68,22 +65,23 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
       return;
 
     // Bond to it
-    QBond& bond = getBond(cSEQUENCE);
+    QBond& bond = bondable.getBond(cSEQUENCE);
     if (bond.bond(cSEQUENCE, ws.getPick(), Sequence.cCOMMON))
       mState = cSTATE_REWINDING; // go to the beginning
   }
 
   Void build() {
     EventWindow ew;
+    IBondable& bondable = getBondable();
 
     // Get sequence item
-    SiteNum siteItem = getBond(cSEQUENCE).getSiteNumber();
+    SiteNum siteItem = bondable.getBond(cSEQUENCE).getSiteNumber();
     if (!ew.isAccessible(siteItem))
       return;
     Sequence& item = (Sequence&) ew[siteItem];
 
     // Build tree node
-    if (!getBond(cTREE).isBonded()) {
+    if (!bondable.getBond(cTREE).isBonded()) {
       buildRoot(item);
     } else {
       buildChild(item);
@@ -93,6 +91,7 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   Void buildRoot(Sequence& item) {
     EventWindow ew;
     EventWindowMisc ewm;
+    IBondable& bondable = getBondable();
 
     // Build tree
     SiteNum site = ewm.findEmptySite(QBond.cMAX_DIST);
@@ -103,7 +102,7 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
     ew[site] = tree;
 
     // Bond to it
-    if (!getBond(cTREE).bond(cTREE, site, Tree.cCOMMON)) {
+    if (!bondable.getBond(cTREE).bond(cTREE, site, Tree.cCOMMON)) {
       // cleanup
       Empty empty;
       ew[site] = empty;
@@ -118,9 +117,10 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
     EventWindow ew;
     EventWindowMisc ewm;
     TreeData td;
+    IBondable& bondable = getBondable();
 
     // Get current subtree
-    SiteNum siteTree = getBond(cTREE).getSiteNumber();
+    SiteNum siteTree = bondable.getBond(cTREE).getSiteNumber();
     if (!ew.isAccessible(siteTree))
       return;
     Tree& tree = (Tree&) ew[siteTree];
@@ -163,7 +163,7 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
     if (status == BU.cSTATUS_NO_NEXT) {
       mState = cSTATE_BUILDING;
 
-    } else if (status != BU.cSTATUS_OK && status != BU.cSTATUS_INACCESSIBLE) {
+    } else if (bu.isError(status)) {
       mState = cSTATE_ERROR;
     }
   }
@@ -171,13 +171,13 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   Void advance() {
     BU bu;
     BU.Status status = bu.traverse(cSEQUENCE, Sequence.cNEXT, Sequence.cCOMMON);
-    if (status == BU.cSTATUS_OK) {
+    if (status == BU.cSTATUS_NO_NEXT) {
+      mState = cSTATE_DONE_BUILDING;
+
+    } else if (bu.isOk(status)) {
       mState = cSTATE_BUILDING;
 
-    } else if (status == BU.cSTATUS_NO_NEXT) {
-      mState = cSTATE_DONE;
-
-    } else if (status != BU.cSTATUS_INACCESSIBLE) {
+    } else if (bu.isError(status)) {
       mState = cSTATE_ERROR;
     }
   }
@@ -185,10 +185,10 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   Void up() {
     BU bu;
     BU.Status status =  bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
-    if (status == BU.cSTATUS_OK) {
+    if (bu.isOk(status)) {
       mState = cSTATE_BUILDING;
 
-    } else if (status != BU.cSTATUS_INACCESSIBLE) {
+    } else if (bu.isError(status)) {
       mState = cSTATE_ERROR;
     }
   }
@@ -196,10 +196,10 @@ element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   Void down() {
     BU bu;
     BU.Status status = bu.traverse(cTREE, mDownChildIndex, Tree.cCOMMON);
-    if (status == BU.cSTATUS_OK) {
+    if (bu.isOk(status)) {
       mState = cSTATE_ADVANCING;
 
-    } else if (status != BU.cSTATUS_INACCESSIBLE) {
+    } else if (bu.isError(status)) {
       mState = cSTATE_ERROR;
     }
 

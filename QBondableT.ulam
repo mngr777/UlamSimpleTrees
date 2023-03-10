@@ -3,6 +3,10 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
 
   QBond mBonds[cMAX_BOND_NUM];
 
+  @Override QBond.Index getBondNum() {
+    return cMAX_BOND_NUM;
+  }
+
   @Override QBond& getBond(QBond.Index index) {
     if (index >= cMAX_BOND_NUM)
       fail("TBondable.getBond: index is out of bounds");

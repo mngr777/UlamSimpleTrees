@@ -4,8 +4,8 @@
    \symbol AS
    \color #888
  */
-element AntStart {
-  C2D.Dir mDir;
+element AntTrailStart {
+  C2D.Dir mDir = 2u; // east
 
   @Override Void renderGraphics() {
     Drawable drawable;
@@ -32,11 +32,12 @@ element AntFood {}
 
 local typedef EventWindow.SiteNum SiteNum;
 local typedef DataUtils.Datum Datum;
+local typedef QBondableT(2u) QBondable2;
 
 /**
    \color #ccc
  */
-element Ant : QBondableT(2u) + QMortal {
+element Ant : QBondable2 + QMortal {
   typedef C2D.Dir Dir;
 
   typedef TreeData.Symbol Symbol;
@@ -45,14 +46,15 @@ element Ant : QBondableT(2u) + QMortal {
   typedef TreeData.Byte Byte;
 
   constant QBond.Index cTREE = 0u;
-  // constant QBond.Index cSTATE = 1u;
+  constant QBond.Index cSTATE = 1u; // not implemented
 
-  constant Symbol cCONDITIONAL_IS_FOOD_AHEAD = 0x1;
+  constant Symbol cCONDITIONAL_IF_FOOD_AHEAD = 0x1;
   constant Symbol cFUNCTION_FORWARD          = 0x2;
   constant Symbol cFUNCTION_LEFT             = 0x3;
   constant Symbol cFUNCTION_RIGHT            = 0x4;
   constant Symbol cFUNCTION_PROGN            = 0x5;
 
+  Bool mInit = false;
   Bool mIsOnTrail = false;
   Bool mIsMoving = false;
   Dir mDir = 2u; // east
@@ -64,6 +66,24 @@ element Ant : QBondableT(2u) + QMortal {
   Bool mSideFirst = true;
 
   @Override Void behave() {
+    EventWindow ew;
+    QBond& treeBond = getBond(cTREE);
+
+    if (!treeBond.isBonded())
+      return; // no program
+
+    if (!mInit) {
+      // Rewind for first run
+      SiteNum treeSite = treeBond.getSiteNumber();
+      Tree& tree = (Tree&) ew[treeSite];
+      if (!tree.isRoot()) {
+        BondUtils bu;
+        bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
+        return;
+      }
+      mInit = true;
+    }
+
     if (mIsMoving) {
       swapForward();
 
@@ -118,6 +138,7 @@ element Ant : QBondableT(2u) + QMortal {
       return; // no tree too execute
     Tree& tree = (Tree&) ew[treeBond.getSiteNumber()];
     Datum result = tree.getResult();
+    Datum data = tree.getData();
 
     if (td.hasValue(result) && td.isFinal(result)) {
       // The subtree is already evaluated
@@ -133,10 +154,16 @@ element Ant : QBondableT(2u) + QMortal {
           result = td.unsValue(result);
           tree.setResult(result);
         }
+      } else {
+        // Root node is successfully evaluated!
+        // (We could wait here for someone to consume the result, but there's
+        // no need in this case.)
+        result = td.setIsFinal(result, false);
+        result = td.unsValue(result);
+        tree.setResult(result);
       }
-      // NOTE: if at ther root, wait for someone to consume the result (unset the value)
 
-    } else if (td.hasValue(result) && td.getType(result) == TreeData.cTYPE_CONDITIONAL) {
+    } else if (td.hasValue(result) && td.getType(data) == TreeData.cTYPE_CONDITIONAL) {
       // Non-final result value for conditionals is selected branch number.
       // (Conditionals don't need to store first argument, since they can have
       // only one at most with one branch.)
@@ -148,13 +175,14 @@ element Ant : QBondableT(2u) + QMortal {
       } else {
         // Move to selected branch
         QBond.Index index = (branch == 0u) ? Tree.cLEFT : Tree.cRIGHT;
-        bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
+        bu.traverse(cTREE, index, Tree.cCOMMON);
       }
 
     } else {
       // Eval if there's enough arguments, or move to children
       Arity argNumRequired = getArgNum(tree);
       if (argNumRequired == 1u && td.hasValue(result)) {
+        // NOTE: unused branch, no functions with single argument
         eval(tree, td.getValue(result));
 
       } else if (argNumRequired == 0u) {
@@ -162,7 +190,7 @@ element Ant : QBondableT(2u) + QMortal {
 
       } else {
         QBond.Index index = td.hasValue(result) ? Tree.cLEFT : Tree.cRIGHT;
-        bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
+        bu.traverse(cTREE, index, Tree.cCOMMON);
       }
     }
   }
@@ -228,10 +256,17 @@ element Ant : QBondableT(2u) + QMortal {
     TreeData td;
     Symbol symbol = td.getSymbol(tree.getData());
 
+    DebugUtils du;
+
     Bool ok = true;
     Arity branch = 0u;
-    if (symbol == cCONDITIONAL_IS_FOOD_AHEAD) {
+    if (symbol == cCONDITIONAL_IF_FOOD_AHEAD) {
       branch = isFoodAhead() ? 0u : 1u;
+      if (branch == 0u) {
+        du.print("is food ahead? yes");
+      } else {
+        du.print("is food ahead? no");
+      }
     } else {
       ok = false; // unknown symbol, hang up
     }
@@ -249,12 +284,17 @@ element Ant : QBondableT(2u) + QMortal {
     TreeData td;
     Symbol symbol = td.getSymbol(tree.getData());
 
+    DebugUtils du;
+
     Bool ok = true;
     if (symbol == cFUNCTION_FORWARD) {
+      du.print("forward");
       forward();
     } else if (symbol == cFUNCTION_LEFT) {
+      du.print("left");
       left();
     } else if (symbol == cFUNCTION_RIGHT) {
+      du.print("right");
       right();
     } else if (symbol == cFUNCTION_PROGN) {
       // do nothing
@@ -305,7 +345,7 @@ element Ant : QBondableT(2u) + QMortal {
     mDir = (Dir) (((Int) mDir + 6) % 8);
   }
 
-  // NOTE: the ant is no longer at 0 after swapping,
+  // NOTE: the ant is no longer at site 0 after swapping,
   // "self" reference won't work
   Void swapForward() {
     EventWindow ew;
@@ -317,10 +357,10 @@ element Ant : QBondableT(2u) + QMortal {
     // What is ahead?
     Bool isNone = ew.isEmpty(coord);
     Bool isFood = (ew[coord] is AntFood);
-    Bool isStart = (ew[coord] is AntStart);
+    Bool isStart = (ew[coord] is AntTrailStart);
     Dir startDir = 0u;
     if (isStart) {
-      AntStart& start = (AntStart&) ew[coord];
+      AntTrailStart& start = (AntTrailStart&) ew[coord];
       startDir = start.mDir;
     }
 
@@ -348,7 +388,7 @@ element Ant : QBondableT(2u) + QMortal {
     if (!sh.swap(0u, ew.getSiteNumberRaw(coord))) {
       // Probably can't move because of our bonds,
       // undo everything
-      ew[0] = atom;
+      ew[coord] = atom;
       if (isFood) {
         mEaten--;
       } else if (isStart) {
@@ -361,10 +401,12 @@ element Ant : QBondableT(2u) + QMortal {
 
   C2D getForwardCoord() {
     C2D origin;
-    return origin.neighbor(mDir);
+    return origin.neighbor(mDir); // TODO: use ew.mapSym?
   }
 
   @Override Void renderGraphics() {
+    self.QBondable2.renderGraphics();
+
     Drawable drawable;
     if (!drawable.canDraw())
       return;
@@ -379,3 +421,4 @@ element Ant : QBondableT(2u) + QMortal {
     drawable.drawMaskedLine(start, end, oncol, offcol, 0xffffffff);
   }
 }
+
