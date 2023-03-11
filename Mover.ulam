@@ -16,7 +16,10 @@ element Mover: QBondableT(1u) {
     EventWindow ew;
     SwapHelper sh;
     C2D coord;
-    coord = coord.neighbor(mDir);
-    sh.swap(0u, ew.getSiteNumber(coord));
+    for (Unsigned i = 0u; i < 3u; i++) {
+      coord = coord.neighbor(mDir);
+      if (sh.swap(0u, ew.getSiteNumber(coord)))
+        return;
+    }
   }
 }
