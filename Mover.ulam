@@ -4,6 +4,8 @@
 element Mover: QBondableT(1u) {
   typedef C2D.Dir Dir;
 
+  constant QBond.Index cCOMMON = 0u;
+
   Dir mDir = 6u; // west
 
   Void setDir(C2D.Dir dir) {

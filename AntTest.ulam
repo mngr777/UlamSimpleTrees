@@ -83,8 +83,9 @@ element AntTest : QBondableT(1u) + QMortal {
 element AntTreeBuilder : QTreeBuilder + QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
   typedef EventWindow.SiteNum SiteNum;
 
-  constant State cSTATE_PLACING_TRAIL = cSTATE_DONE_BUILDING; // alias
-  constant State cSTATE_PLACING_ANT = cSTATE_FIRST_UNRESERVED;
+  constant State cSTATE_PLACING_MOVER = cSTATE_DONE_BUILDING; // alias
+  constant State cSTATE_PLACING_TRAIL = cSTATE_FIRST_UNRESERVED;
+  constant State cSTATE_PLACING_ANT = cSTATE_PLACING_TRAIL + 1u;
   constant State cSTATE_DONE = cSTATE_PLACING_ANT + 1u;
 
   @Override IBondable& getBondable() {
@@ -106,11 +107,42 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(2u) + QDiffusableT(1000u, 2u)
 
   Void step() {
     self.QTreeBuilder.step();
-    if (getState() == cSTATE_PLACING_TRAIL) {
+    if (getState() == cSTATE_PLACING_MOVER) {
+      placeMover();
+    } else if (getState() == cSTATE_PLACING_TRAIL) {
       placeTrail();
     } else if (getState() == cSTATE_PLACING_ANT) {
       placeAnt();
     }
+  }
+
+  /**
+     Attach a mover to the sequence to drag it away
+   */
+  Void placeMover() {
+    BondUtils bu;
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    QBond& seqBond = getBond(cSEQUENCE); // assume attached
+    SiteNum site = ewm.findEmptySiteAround(seqBond.getCoord(), 1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return;
+
+    Mover mover;
+    ew[site] = mover;
+
+    // Replace ourselves with mover
+    SiteNum seqSite = seqBond.getSiteNumber();
+    BondUtils.Status status = bu.replace(seqSite, Sequence.cCOMMON, site, Mover.cCOMMON, Sequence.cCOMMON);
+    if (!bu.isOk(status)) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return;
+    }
+
+    setState(cSTATE_PLACING_TRAIL);
   }
 
   Void placeTrail() {
@@ -419,7 +451,7 @@ transient AntTrailData1 : AntTrailData {
 }
 
 transient AntTrailData2 : AntTrailData {
-  constant Size cSIZE = 28u;
+  constant Size cSIZE = 27u;
   /*
                       ^
                       #
@@ -431,11 +463,11 @@ transient AntTrailData2 : AntTrailData {
              .#######..
          (8) #   (9)
              #
-      >.####..
+      >####..
          (7)
    */
   Move data[cSIZE] = {
-    0, 3, 3, 3, 3, 0, 0, 1,       // (7)
+    3, 3, 3, 3, 0, 0, 1,          // (7)
     3, 3, 0, 2,                   // (8)
     3, 3, 3, 3, 3, 3, 3, 0, 0, 1, // (9)
     3, 3, 3, 0, 0, 3              // (10.1)

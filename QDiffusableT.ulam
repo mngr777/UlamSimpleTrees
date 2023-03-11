@@ -57,7 +57,12 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
     return ws.getPick();
   }
 
+  // NOTE: this is intended to draw atoms close to non-diffusable
+  // atom they're attached to. It's not clear that this helps.
   SiteNum getBondableDiffusionSite() {
+    if (QBond.cMAX_DIST < 3u)
+      return getDiffusionSite();
+
     EventWindow ew;
 
     // Collect coordinates of attached non-diffusable atoms
@@ -66,11 +71,10 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
 
     C2D staticCoords[QBond.Index.maxof];
     Unsigned staticCoordNum = 0u;
-
     for (QBond.Index i = 0u; i < bondable.getBondNum(); i++) {
       QBond& bond = bondable.getBond(i);
       C2D coord = bond.getCoord();
-      if (!ew.isEmpty(coord) && !(ew[coord] is IDiffusable))
+      if (!(ew[coord] is IDiffusable))
         staticCoords[staticCoordNum++] = coord;
     }
 
@@ -90,7 +94,7 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
       for (Unsigned i = 0u; i < staticCoordNum; i++) {
         Unsigned dist = coord.manhattanDistance(staticCoords[i]);
         if (0u < dist && dist <= 2u) {
-          weight = 2u;
+          weight = 10u;
           break;
         }
       }
