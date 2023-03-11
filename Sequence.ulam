@@ -4,7 +4,7 @@ local typedef EventWindow.SiteNum SiteNum;
 /**
    \symmetry all
  */
-element Sequence : QBondableT(3u) + QDiffusableT(1000u, 2u) {
+element Sequence : QBondableT(3u) + QDiffusableT(1000u) {
   typedef DataUtils.Datum Datum;
 
   constant QBond.Index cCOMMON = 0u;

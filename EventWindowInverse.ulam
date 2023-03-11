@@ -3,8 +3,6 @@
    symmetry. For example, EventWindowInverse.getCoord(C2D(0, -1)) always points
    North.
    This allows to store cell position and address it under different symmetry.
-
-   TODO: use MDist instead of this
  */
 quark EventWindowInverse {
   typedef EventWindow.SiteNum SiteNum;
@@ -22,6 +20,7 @@ quark EventWindowInverse {
     return mapSym(coord);
   }
 
+  // Is there a better way to do it?
   C2D mapSym(C2D coord) {
     Symmetry sym = ew.getSymmetry();
 

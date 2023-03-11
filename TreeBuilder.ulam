@@ -6,7 +6,7 @@ local typedef BondUtils BU;
     \symbol TB
     \symmetry all
  */
-element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
+element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u) + QMortal {
   typedef Unsigned(3) State;
 
   constant QBond.Index cSEQUENCE = 0u;

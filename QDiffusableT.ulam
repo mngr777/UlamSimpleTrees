@@ -1,6 +1,6 @@
 local typedef EventWindow.SiteNum SiteNum;
 
-quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radius cDIFFUSION_RADIUS): IDiffusable {
+quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radius cDIFFUSION_RADIUS = 4u): IDiffusable {
 
   // constant Diffusability cCOMPLETE_DIFFUSABILITY = 10000u;
   constant Diffusability cCOMPLETE_DIFFUSABILITY = 1000u;
@@ -57,9 +57,52 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
     return ws.getPick();
   }
 
-  // NOTE: this is intended to draw atoms close to non-diffusable
-  // atom they're attached to. It's not clear that this helps.
+  /**
+     The idea here is to make the bonds less likely to get fully
+     stretched by diffusion, so an agent can stretch a bond when
+     moving and make bonded atoms follow.
+     This seems to work, more testing needed.
+   */
   SiteNum getBondableDiffusionSite() {
+    if (QBond.cMAX_DIST < 4u)
+      return getDiffusionSite();
+
+    EventWindow ew;
+    IBondable& bondable = (IBondable&) ew[0];
+
+    C2D coords[QBond.Index.maxof];
+    QBond.Index coordNum = 0u;
+    for (QBond.Index i = 0u; i < bondable.getBondNum(); i++) {
+      QBond& bond = bondable.getBond(i);
+      if (!bond.isBonded())
+        continue;
+       coords[coordNum++] = bond.getCoord();
+    }
+
+    WindowServices ws;
+    ws.reset(1u, getDiffusionRadius());
+    for (Int s = ws.next(); s >= 0; s = ws.next()) {
+      SiteNum site = (SiteNum) s;
+      C2D coord = ew.getCoordRaw(site);
+
+      Unsigned weight = 5u;
+      for (QBond.Index i = 0u; i < coordNum; i++) {
+        Unsigned dist = coord.manhattanDistance(coords[i]);
+        if (dist > 3u) {
+          weight = 1u;
+          break;
+        }
+      }
+      ws.hit(0u, weight);
+    }
+    return ws.getPick();
+  }
+
+  /**
+    This is intended to draw atoms close to non-diffusable
+    atom they're attached to. It's not clear that this helps.
+  */
+  SiteNum getBondableDiffusionSite_2() {
     if (QBond.cMAX_DIST < 3u)
       return getDiffusionSite();
 
@@ -73,6 +116,9 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
     Unsigned staticCoordNum = 0u;
     for (QBond.Index i = 0u; i < bondable.getBondNum(); i++) {
       QBond& bond = bondable.getBond(i);
+      if (!bond.isBonded())
+        continue;
+
       C2D coord = bond.getCoord();
       if (!(ew[coord] is IDiffusable))
         staticCoords[staticCoordNum++] = coord;
@@ -93,7 +139,12 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
       Unsigned weight = 1u;
       for (Unsigned i = 0u; i < staticCoordNum; i++) {
         Unsigned dist = coord.manhattanDistance(staticCoords[i]);
-        if (0u < dist && dist <= 2u) {
+
+        if (dist == 1u || dist == 2u) {
+          weight = 20u;
+          break;
+        }
+        if (dist == 3u) {
           weight = 10u;
           break;
         }

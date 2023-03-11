@@ -80,7 +80,7 @@ element AntTest : QBondableT(1u) + QMortal {
    \symbol AB
    \color #fff
  */
-element AntTreeBuilder : QTreeBuilder + QBondableT(2u) + QDiffusableT(1000u, 2u) + QMortal {
+element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + QMortal {
   typedef EventWindow.SiteNum SiteNum;
 
   constant State cSTATE_PLACING_MOVER = cSTATE_DONE_BUILDING; // alias

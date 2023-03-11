@@ -3,7 +3,7 @@ local typedef EventWindow.SiteNum SiteNum;
 /**
    \symmetry all
  */
-element Tree : QBondableT(4u) + QDiffusableT(1000u, 2u) {
+element Tree : QBondableT(4u) + QDiffusableT(1000u) {
   typedef DataUtils.Datum Datum;
 
   constant QBond.Index cCOMMON = 0u;
