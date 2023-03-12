@@ -37,7 +37,7 @@ local typedef QBondableT(2u) QBondable2;
 /**
    \color #ccc
  */
-element Ant : QBondable2 + QMortal {
+element Ant : QBondable2 {
   typedef C2D.Dir Dir;
 
   typedef TreeData.Symbol Symbol;

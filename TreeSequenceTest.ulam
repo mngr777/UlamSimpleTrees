@@ -38,10 +38,8 @@ element TreeSequenceTest : QBondableT(1u) + QMortal {
         mCounter++;
     } else if (mCounter == cLENGTH) {
       TreeSequenceTestParameters params;
-      if (!params.pATTACH_BUILDER || buildTreeBuilder()) {
-        getBond(0).breakup();
+      if (!params.pATTACH_BUILDER || buildTreeBuilder())
         die(); // done
-      }
     }
   }
 

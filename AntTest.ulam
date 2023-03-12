@@ -96,8 +96,6 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + Q
     step();
 
     if (mState == cSTATE_DONE || mState == cSTATE_ERROR) {
-      getBond(cSEQUENCE).breakup();
-      getBond(cTREE).breakup();
       die();
 
     } else if (getState() < cSTATE_PLACING_TRAIL) { // stand still when placing stuff

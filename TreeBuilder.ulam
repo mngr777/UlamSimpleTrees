@@ -1,209 +1,23 @@
 local typedef BondUtils BU;
 
-// TODO: inherit from  QTreeBuilder
-
 /**
     \symbol TB
     \symmetry all
  */
-element TreeBuilder : QBondableT(2u) + QDiffusableT(1000u) + QMortal {
-  typedef Unsigned(3) State;
+element TreeBuilder : QTreeBuilder + QBondableT(2u) + QDiffusableT(1000u) + QMortal {
 
-  constant QBond.Index cSEQUENCE = 0u;
-  constant QBond.Index cTREE = 1u;
-
-  constant State cSTATE_READY       = 0u;
-  constant State cSTATE_REWINDING   = 1u;
-  constant State cSTATE_BUILDING    = 2u;
-  constant State cSTATE_ADVANCING   = 3u;
-  constant State cSTATE_MOVING_UP   = 4u;
-  constant State cSTATE_MOVING_DOWN = 5u;
-  constant State cSTATE_DONE        = 6u;
-  constant State cSTATE_ERROR       = 7u;
-
-  State mState = cSTATE_READY;
-  TreeData.Arity mDownChildIndex = TreeData.Arity.maxof;
+  virtual IBondable& getBondable() {
+    return self;
+  }
 
   @Override Void behave() {
     step();
-    if (mState == cSTATE_DONE || mState == cSTATE_ERROR) {
-      getBond(cSEQUENCE).breakup();
-      getBond(cTREE).breakup();
+
+    if (mState == cSTATE_DONE_BUILDING || mState == cSTATE_ERROR) {
       die();
+
     } else {
       diffuse();
     }
-  }
-
-  Void step() {
-    if (mState == cSTATE_READY) {
-      attach();
-    } else if (mState == cSTATE_REWINDING) {
-      rewind();
-    } else if (mState == cSTATE_BUILDING) {
-      build();
-    } else if (mState == cSTATE_ADVANCING) {
-      advance();
-    } else if (mState == cSTATE_MOVING_UP) {
-      up();
-    } else if (mState == cSTATE_MOVING_DOWN) {
-      down();
-    }
-  }
-
-  Void attach() {
-    // Check if already attached from somewhere else
-    if (getBond(cSEQUENCE).isBonded()) {
-      mState = cSTATE_REWINDING; // go to the beginning
-      return;
-    }
-
-    // Search for sequence
-    WindowServices ws;
-    ws.reset(1u, QBond.cMAX_DIST);
-    Sequence sequence;
-    AtomUtils au;
-    ws.scan(au.getType(sequence));
-    if (ws.getHits() == 0u)
-      return;
-
-    // Bond to it
-    QBond& bond = getBond(cSEQUENCE);
-    if (bond.bond(cSEQUENCE, ws.getPick(), Sequence.cCOMMON))
-      mState = cSTATE_REWINDING; // go to the beginning
-  }
-
-  Void build() {
-    EventWindow ew;
-
-    // Get sequence item
-    SiteNum siteItem = getBond(cSEQUENCE).getSiteNumber();
-    if (!ew.isAccessible(siteItem))
-      return;
-    Sequence& item = (Sequence&) ew[siteItem];
-
-    // Build tree node
-    if (!getBond(cTREE).isBonded()) {
-      buildRoot(item);
-    } else {
-      buildChild(item);
-    }
-  }
-
-  Void buildRoot(Sequence& item) {
-    EventWindow ew;
-    EventWindowMisc ewm;
-
-    // Build tree
-    SiteNum site = ewm.findEmptySite(QBond.cMAX_DIST);
-    if (site == SiteNum.maxof)
-      return;
-    Tree tree;
-    tree.setData(item.getData());
-    ew[site] = tree;
-
-    // Bond to it
-    if (!getBond(cTREE).bond(cTREE, site, Tree.cCOMMON)) {
-      // cleanup
-      Empty empty;
-      ew[site] = empty;
-      return;
-    }
-
-    // Advance
-    mState = cSTATE_ADVANCING;
-  }
-
-  Void buildChild(Sequence& item) {
-    EventWindow ew;
-    EventWindowMisc ewm;
-    TreeData td;
-
-    // Get current subtree
-    SiteNum siteTree = getBond(cTREE).getSiteNumber();
-    if (!ew.isAccessible(siteTree))
-      return;
-    Tree& tree = (Tree&) ew[siteTree];
-
-    // Is this subtree complete?
-    TreeData.Arity arityTree = td.getArity(tree.getData());
-    if (tree.getChildNum() == arityTree) {
-      mState = cSTATE_MOVING_UP; // done with this subtree
-      return;
-    }
-
-    // Build child
-    SiteNum site = ewm.findEmptySite(QBond.cMAX_DIST);
-    if (site == SiteNum.maxof)
-      return;
-    Tree child;
-    child.setData(item.getData());
-    ew[site] = child;
-
-    // Bond child to parent
-    QBond.Index indexChild = (tree.getChildNum() == 0u)
-      ? Tree.cLEFT
-      : Tree.cRIGHT;
-    QBond& bondChild = tree.getBond(indexChild);
-    if (!bondChild.bond(siteTree, indexChild, site, Tree.cPARENT)) {
-      // cleanup
-      Empty empty;
-      ew[site] = empty;
-      return;
-    }
-
-    // Move to child
-    mState = cSTATE_MOVING_DOWN;
-    mDownChildIndex = (TreeData.Arity) indexChild;
-  }
-
-  Void rewind() {
-    BU bu;
-    BU.Status status = bu.traverse(cSEQUENCE, Sequence.cPREV, Sequence.cCOMMON);
-    if (status == BU.cSTATUS_NO_NEXT) {
-      mState = cSTATE_BUILDING;
-
-    } else if (status != BU.cSTATUS_OK && status != BU.cSTATUS_INACCESSIBLE) {
-      mState = cSTATE_ERROR;
-    }
-  }
-
-  Void advance() {
-    BU bu;
-    BU.Status status = bu.traverse(cSEQUENCE, Sequence.cNEXT, Sequence.cCOMMON);
-    if (status == BU.cSTATUS_OK) {
-      mState = cSTATE_BUILDING;
-
-    } else if (status == BU.cSTATUS_NO_NEXT) {
-      mState = cSTATE_DONE;
-
-    } else if (status != BU.cSTATUS_INACCESSIBLE) {
-      mState = cSTATE_ERROR;
-    }
-  }
-
-  Void up() {
-    BU bu;
-    BU.Status status =  bu.traverse(cTREE, Tree.cPARENT, Tree.cCOMMON);
-    if (status == BU.cSTATUS_OK) {
-      mState = cSTATE_BUILDING;
-
-    } else if (status != BU.cSTATUS_INACCESSIBLE) {
-      mState = cSTATE_ERROR;
-    }
-  }
-
-  Void down() {
-    BU bu;
-    BU.Status status = bu.traverse(cTREE, mDownChildIndex, Tree.cCOMMON);
-    if (status == BU.cSTATUS_OK) {
-      mState = cSTATE_ADVANCING;
-
-    } else if (status != BU.cSTATUS_INACCESSIBLE) {
-      mState = cSTATE_ERROR;
-    }
-
-    if (mState != cSTATE_MOVING_DOWN)
-      mDownChildIndex = TreeData.Arity.maxof;
   }
 }
