@@ -1,0 +1,289 @@
+element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
+  typedef Unsigned(8) State;
+
+  typedef DataUtils.Datum Datum;
+
+  typedef TreeData.Symbol Symbol;
+  typedef TreeData.Arity Arity;
+  typedef TreeData.Type Type;
+  typedef TreeData.Byte Byte;
+
+  constant QBond.Index cPROGRAM = 0u;
+  constant QBond.Index cSTACK   = 1u;
+  constant QBond.Index cINPUT   = 2U;
+  constant QBond.Index cOUTPUT  = 3u;
+
+  constant State cSTATE_INIT = 0u;
+  constant State cSTATE_EXEC = 1u;
+  constant State cSTATE_DONE = 6u;
+  constant State cSTATE_ERROR = 7u;
+
+  // TODO: get some system here
+  constant Symbol cSYM_INPUT        = 0x1;
+  constant Symbol cSYM_OUTPUT       = 0x2;
+  constant Symbol cSYM_SET          = 0x3;
+  constant Symbol cSYM_PUSH         = 0x4;
+  constant Symbol cSYM_POP          = 0x5;
+  constant Symbol cSYM_PUSH_COPY    = 0x6;
+  constant Symbol cSYM_ARITY        = 0x7;
+  constant Symbol cSYM_NUM_ATTACHED = 0x8;
+  constant Symbol cSYM_TRAVERSE_1   = 0x9;
+  constant Symbol cSYM_PROG2        = 0xa;
+  constant Symbol cSYM_SUB          = 0xb;
+  constant Symbol cSYM_INC          = 0xc;
+  constant Symbol cBUILD            = 0xd;
+  constant Symbol cBUILD_CHILD      = 0xe;
+  constant Symbol cUNSET            = 0Xf;
+  constant Symbol cIS_SET           = 0x10;
+  constant Symbol cIF_IS_SET        = 0x11;
+  constant Symbol cIF_IS_ZERO       = 0x12;
+  constant Symbol cIF_IS_ATTACHED   = 0x13;
+
+  State mState;
+  Datum mValue;
+
+  QBond.Index mBond = cINPUT;
+  QBond.Index mTraverseTo;
+
+  @Override Void behave() {
+    step();
+  }
+
+  Void step() {
+    if (mState == cSTATE_INIT) {
+      init();
+
+    } if (mState == cSTATE_EXEC) {
+      exec();
+    }
+  }
+
+  Void init() {
+    if (getBond(cPROGRAM).isBonded())
+      mState = cSTATE_EXEC;
+  }
+
+  Void exec() {
+    QBond& treeBond = getBond(cPROGRAM);
+    if (!treeBond.isBonded())
+      return; // no program
+
+    EventWindow ew;
+    TreeData td;
+
+    Tree& tree = (Tree&) ew[treeBond.getSiteNumber()];
+    Datum data = tree.getData();
+    Datum result = tree.getResult();
+
+    if (td.hasValue(result) && td.isFinal(result)) {
+      complete(tree);
+    } else if (td.hasValue(result) && td.getType(data) == TreeData.cTYPE_CONDITIONAL) {
+      branch(tree);
+    } else {
+      evalOrMoveToChild(tree);
+    }
+  }
+
+  Void complete(Tree& tree) {
+    BondUtils bu;
+    EventWindow ew;
+    TreeData td;
+
+    if (tree.isRoot()) {
+      mState = cSTATE_DONE;
+      return;
+    }
+
+    // Move to parent
+    if (!bu.isOk(bu.traverse(cPROGRAM, Tree.cPARENT, Tree.cCOMMON)))
+      return;
+
+    Datum result = tree.getResult();
+
+    // Pass the result to parent
+    QBond& parentBond = tree.getBond(Tree.cPARENT);
+    Tree& parent = (Tree&) ew[parentBond.getSiteNumber()];
+    evalOrStoreArgument(parent, td.getValue(result));
+
+    // Unset child's value
+    result = td.setIsFinal(result, false);
+    result = td.unsValue(result);
+    tree.setResult(result);
+  }
+
+  Void branch(Tree& tree) {
+    BondUtils bu;
+    TreeData td;
+
+    Datum result = tree.getResult();
+    Arity branch = (Arity) td.getValue(result);
+    if (branch == Arity.maxof) {
+      // done
+      result = td.setIsFinal(result, true);
+      result = td.setValue(result, TreeData.cNIL);
+      tree.setData(result);
+    } else {
+      // Move to selected branch
+      QBond.Index index = (branch == 0u) ? Tree.cLEFT : Tree.cRIGHT;
+      bu.traverse(cPROGRAM, index, Tree.cCOMMON);
+    }
+  }
+
+  // NOTE:
+  // * assuming eval always succeeds, so there's no need to store the 2nd argument to retry
+  // * also assume that arguments are always passed in correct order
+  Void evalOrStoreArgument(Tree& tree, Byte arg) {
+    TreeData td;
+
+    Datum result = tree.getResult();
+    Arity argNumRequired = getArgNum(tree);
+    Bool hasArg = td.hasValue(result);
+
+    if (argNumRequired > 1 && !hasArg) {
+      // Store as 1st argument
+      result = td.setIsFinal(result, false);
+      result = td.setValue(result, arg);
+      tree.setResult(result);
+
+    } else if (argNumRequired > 1) {
+      eval(tree, td.getValue(result), arg);
+
+    } else if (argNumRequired == 1 && !hasArg) {
+      eval(tree, arg, TreeData.cNIL);
+
+    } else {
+      // Zero arguments required or one is required and one is already stored.
+      // This normally happens when branch selected by a conditional returns,
+      // just store argument as final result
+      result = td.setIsFinal(result, true);
+      result = td.setValue(result, arg);
+      tree.setResult(result);
+    }
+  }
+
+  Void evalOrMoveToChild(Tree& tree) {
+    BondUtils bu;
+    TreeData td;
+
+    Datum result = tree.getResult();
+    Arity argNumRequired = getArgNum(tree);
+
+    if (argNumRequired == 1u && td.hasValue(result)) {
+      eval(tree, td.getValue(result), TreeData.cNIL);
+
+    } else if (argNumRequired == 0u) {
+      eval(tree, TreeData.cNIL, TreeData.cNIL);
+
+    } else {
+      QBond.Index index = td.hasValue(result) ? Tree.cRIGHT : Tree.cLEFT;
+      bu.traverse(cPROGRAM, index, Tree.cCOMMON);
+    }
+  }
+
+  Void eval(Tree& tree, Byte arg1, Byte arg2) {
+    TreeData td;
+
+    Datum data = tree.getData();
+    Type type = td.getType(data);
+
+    if (type == TreeData.cTYPE_CONDITIONAL) {
+      evalConditional(tree, arg1);
+
+    } else if (type == TreeData.cTYPE_FUNCTION) {
+      evalFunction(tree, arg1, arg2);
+
+    } else {
+      // TODO
+    }
+  }
+
+  Void evalConditional(Tree& tree, Byte arg) {
+    TreeData td;
+    Symbol symbol = td.getSymbol(tree.getData());
+
+    Bool ok = true;
+    QBond.Index branch = 0u;
+    if (symbol == 0x0) {
+      // TODO
+    } else {
+      ok = false;
+    }
+
+    // Store selected branch as argument/non-final value
+    if (ok) {
+      Datum result = tree.getResult();
+      result = td.setIsFinal(result, false);
+      result = td.setValue(result, branch);
+      tree.setResult(result);
+    }
+  }
+
+  Void evalFunction(Tree& tree, Byte arg1, Byte arg2) {
+    TreeData td;
+    Symbol symbol = td.getSymbol(tree.getData());
+
+    Byte value = 0x0;
+    Bool ok = true;
+
+    // TODO
+
+    // Store result value
+    if (ok) {
+      Datum result = tree.getResult();
+      result = td.setIsFinal(result, true);
+      result = td.setValue(result, value);
+      tree.setResult(result);
+    }
+  }
+
+  Arity getArgNum(Tree& tree) {
+    TreeData td;
+    Datum data = tree.getData();
+    return getArgNum(td.getType(data), td.getSymbol(data));
+  }
+
+  Arity getArgNum(Type type, Symbol symbol) {
+    if (type == TreeData.cTYPE_CONDITIONAL) {
+      TreeExecConditionals ec;
+      return ec.getArgNum(symbol);
+
+    } else if (type == TreeData.cTYPE_FUNCTION) {
+      TreeExecFunctions ef;
+      return ef.getArgNum(symbol);
+    }
+
+    return 0u;
+  }
+}
+
+
+transient TreeExecConditionals {
+  typedef TreeData.Symbol Symbol;
+  typedef TreeData.Arity Arity;
+  typedef TreeData.Type Type;
+  typedef TreeData.Byte Byte;
+
+  Arity getArgNum(Symbol symbol) {
+    return 0u; // TODO
+  }
+
+  Void  eval(TreeExec& exec, Symbol symbol, Byte arg1) {
+    // TODO
+  }
+}
+
+
+transient TreeExecFunctions {
+  typedef TreeData.Symbol Symbol;
+  typedef TreeData.Arity Arity;
+  typedef TreeData.Type Type;
+  typedef TreeData.Byte Byte;
+
+  Arity getArgNum(Symbol symbol) {
+    return 0u; // TODO
+  }
+
+  Void eval(TreeExec& exec, Symbol symbol, Byte arg1, Byte arg2) {
+    // TODO
+  }
+}
