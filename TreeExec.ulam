@@ -1,7 +1,13 @@
+/**
+   "Universal" interpreter
+
+   \symbol TE
+ */
 element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
-  typedef Unsigned(8) State;
+  typedef Unsigned(5) State;
 
   typedef DataUtils.Datum Datum;
+  typedef DataUtils.Byte Byte;
 
   typedef TreeData.Symbol Symbol;
   typedef TreeData.Arity Arity;
@@ -9,41 +15,48 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
   typedef TreeData.Byte Byte;
 
   constant QBond.Index cPROGRAM = 0u;
-  constant QBond.Index cSTACK   = 1u;
-  constant QBond.Index cINPUT   = 2U;
+  constant QBond.Index cMEMORY  = 1u;
+  constant QBond.Index cINPUT   = 2u;
   constant QBond.Index cOUTPUT  = 3u;
 
-  constant State cSTATE_INIT = 0u;
-  constant State cSTATE_EXEC = 1u;
-  constant State cSTATE_DONE = 6u;
-  constant State cSTATE_ERROR = 7u;
-
-  // TODO: get some system here
-  constant Symbol cSYM_INPUT        = 0x1;
-  constant Symbol cSYM_OUTPUT       = 0x2;
-  constant Symbol cSYM_SET          = 0x3;
-  constant Symbol cSYM_PUSH         = 0x4;
-  constant Symbol cSYM_POP          = 0x5;
-  constant Symbol cSYM_PUSH_COPY    = 0x6;
-  constant Symbol cSYM_ARITY        = 0x7;
-  constant Symbol cSYM_NUM_ATTACHED = 0x8;
-  constant Symbol cSYM_TRAVERSE_1   = 0x9;
-  constant Symbol cSYM_PROG2        = 0xa;
-  constant Symbol cSYM_SUB          = 0xb;
-  constant Symbol cSYM_INC          = 0xc;
-  constant Symbol cBUILD            = 0xd;
-  constant Symbol cBUILD_CHILD      = 0xe;
-  constant Symbol cUNSET            = 0Xf;
-  constant Symbol cIS_SET           = 0x10;
-  constant Symbol cIF_IS_SET        = 0x11;
-  constant Symbol cIF_IS_ZERO       = 0x12;
-  constant Symbol cIF_IS_ATTACHED   = 0x13;
+  constant State cSTATE_INIT               = 0u;
+  constant State cSTATE_EXEC               = 1u;
+  constant State cSTATE_MEMORY_PREV        = 2u;
+  constant State cSTATE_MEMORY_NEXT        = 3u;
+  constant State cSTATE_MEMORY_WRITE       = 4u;
+  constant State cSTATE_SELECTED_TO_MEMORY = 5u;
+  constant State cSTATE_BUILD              = 6u;
+  constant State cSTATE_BUILD_NEXT         = 7u;
+  constant State cSTATE_TRAVERSE           = 8u;
+  constant State cSTATE_DONE               = 14u;
+  constant State cSTATE_ERROR              = 15u;
 
   State mState;
-  Datum mValue;
 
-  QBond.Index mBond = cINPUT;
-  QBond.Index mTraverseTo;
+  Datum mReg;
+  Datum mReg1; // unused
+
+  QBond.Index mSelectedBond = cINPUT;
+
+  Void setState(State state) {
+    mState = state;
+  }
+
+  Datum getReg() {
+    return mReg;
+  }
+
+  Void setReg(Datum datum) {
+    mReg = datum;
+  }
+
+  Void selectBond(QBond.Index index) {
+    mSelectedBond = index;
+  }
+
+  QBond& getSelectedBond() {
+    return getBond(mSelectedBond);
+  }
 
   @Override Void behave() {
     step();
@@ -53,8 +66,29 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     if (mState == cSTATE_INIT) {
       init();
 
-    } if (mState == cSTATE_EXEC) {
+    } else if (mState == cSTATE_EXEC) {
       exec();
+
+    } else if (mState == cSTATE_MEMORY_PREV) {
+      memoryPrev();
+
+    } else if (mState == cSTATE_MEMORY_NEXT) {
+      memoryNext();
+
+    } else if (mState == cSTATE_MEMORY_WRITE) {
+      memoryWrite();
+
+    } else if (mState == cSTATE_SELECTED_TO_MEMORY) {
+      selectedToMemory();
+
+    } else if (mState == cSTATE_BUILD) {
+      build();
+
+    } else if (mState == cSTATE_BUILD_NEXT) {
+      buildNext();
+
+    } else if (mState == cSTATE_TRAVERSE) {
+      traverse();
     }
   }
 
@@ -82,6 +116,195 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     } else {
       evalOrMoveToChild(tree);
     }
+  }
+
+  Void memoryPrev() {
+    memoryMove(Sequence.cPREV);
+  }
+
+  Void memoryNext() {
+    memoryMove(Sequence.cNEXT);
+  }
+
+  Void memoryWrite() {
+    if (!hasMemory() && !createMemory())
+      return;
+
+    Sequence& item = getMemory();
+    item.setData(getReg());
+
+    setState(cSTATE_EXEC);
+  }
+
+  // NOTE: no state transition required
+  Void memoryRead() {
+    Datum datum = hasMemory()
+      ? getMemory().getData()
+      : TreeData.cNODATA;
+    setReg(datum);
+  }
+
+  Void selectedToMemory() {
+    DebugUtils du;
+    EventWindow ew;
+
+    if (!hasMemory() && !createMemory())
+      return;
+
+    // Get data from selected item
+    QBond& bond = getSelectedBond();
+    if (!bond.isBonded()) {
+      du.print("TreeExec.selectedToMemory: to selected item attached");
+      setState(cSTATE_ERROR);
+    }
+    Sequence& selected = (Sequence&) ew[bond.getSiteNumber()];
+    Datum datum = selected.getData();
+
+    // Copy to memory
+    getMemory().setData(datum);
+
+    setState(cSTATE_EXEC);
+  }
+
+  Void build() {
+    DebugUtils du;
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    // Get data
+    if (!hasMemory()) {
+      du.print("TreeExec.build: memory is empty");
+      setState(cSTATE_ERROR);
+      return;
+    }
+    Datum datum = getMemory().getData();
+
+    // Build
+    SiteNum site = ewm.findEmptySite(1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return;
+    Tree tree;
+    tree.setData(datum);
+    ew[site] = tree;
+
+    QBond& output = getBond(cOUTPUT);
+
+    // If we're already building something, let it go
+    output.breakup();
+
+    // Attach
+    if (!output.bond(cOUTPUT, site, Sequence.cCOMMON)) {
+      // shouldn't happen, complain
+      du.print("TreeExec.build: failed to attach to built root");
+
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return;
+    }
+
+    setState(cSTATE_EXEC);
+  }
+
+  Void buildNext() {
+    DebugUtils du;
+    EventWindow ew;
+    EventWindowMisc ewm;
+    TreeData td;
+
+    // Get parent bond index from register
+    if (!td.hasValue(getReg())) {
+      du.print("TreeExec.buildNext: register is empty");
+      setState(cSTATE_ERROR);
+      return;
+    }
+    QBond.Index parentIndex = (QBond.Index) td.getInteger(getReg());
+
+    // Get data from memory
+    if (!hasMemory()) {
+      du.print("TreeExec.buildNext: memory is empty");
+      setState(cSTATE_ERROR);
+      return;
+    }
+    Datum data = getMemory().getData();
+
+    // Get parent site
+    QBond& output = getBond(cOUTPUT);
+    if (!output.isBonded()) {
+      du.print("TreeExec.buildNext: output is empty");
+      setState(cSTATE_ERROR);
+    }
+    SiteNum parentSite = output.getSiteNumber();
+    Tree& parent = (Tree&) ew[parentSite];
+
+    // Build
+    SiteNum site = ewm.findEmptySiteAround(parent, 1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return;
+    Tree child;
+    child.setData(data);
+    ew[site] = child;
+
+    Bool ok = true;
+
+    // Detach from parent
+    ok = output.breakup();
+    if (!ok)
+      du.print("TreeExec.buildNext: failed to detach from current output");
+
+    // Attach child to parent
+    // TODO: allow to select child bond index (use second register for the argument?)
+    if (ok) {
+      QBond& parentBond = parent.getBond(parentIndex);
+      ok = parentBond.bond(parentSite, parentIndex, site, Tree.cPARENT);
+      if (!ok)
+        du.print("TreeExec.buildNext: failed to attach child to parent");
+    }
+
+    if (!ok) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return;
+    }
+
+    setState(cSTATE_EXEC);
+  }
+
+  Void traverse() {
+    DebugUtils du;
+    BondUtils bu;
+    TreeData td;
+
+    // Get index from register
+    if (!td.hasValue(getReg())) {
+      du.print("TreeExec.traverse: register is empty");
+      setState(cSTATE_ERROR);
+      return;
+    }
+    QBond.Index index = (QBond.Index) td.getInteger(getReg());
+
+    // Get current item
+    QBond& bond = getSelectedBond();
+    if (!bond.isBonded()) {
+      du.print("TreeExec.traverse: selected bond is not attached");
+      setState(cSTATE_ERROR);
+      return;
+    }
+
+    QBond.Index indexBond = bond.getIndex(); // TODO: use second register?
+    BondUtils.Status status = bu.traverse(bond.getIndex(), index, indexBond);
+    if (bu.isOk(status)) {
+      setState(cSTATE_EXEC);
+
+    } else if (bu.isError(status)) {
+      du.print("TreeExec.traverse: failed to traverse, status:");
+      du.print(status);
+
+      setState(cSTATE_ERROR);
+    }
+    // otherwise retry
+
   }
 
   Void complete(Tree& tree) {
@@ -201,39 +424,28 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     TreeData td;
     Symbol symbol = td.getSymbol(tree.getData());
 
-    Bool ok = true;
-    QBond.Index branch = 0u;
-    if (symbol == 0x0) {
-      // TODO
-    } else {
-      ok = false;
-    }
+    TreeExecConditionals ec;
+    Arity branch = ec.eval(self, symbol, arg);
 
     // Store selected branch as argument/non-final value
-    if (ok) {
-      Datum result = tree.getResult();
-      result = td.setIsFinal(result, false);
-      result = td.setValue(result, branch);
-      tree.setResult(result);
-    }
+    Datum result = tree.getResult();
+    result = td.setIsFinal(result, false);
+    result = td.setValue(result, branch);
+    tree.setResult(result);
   }
 
   Void evalFunction(Tree& tree, Byte arg1, Byte arg2) {
     TreeData td;
     Symbol symbol = td.getSymbol(tree.getData());
 
-    Byte value = 0x0;
-    Bool ok = true;
+    TreeExecFunctions ef;
+    Byte value = ef.eval(self, symbol, arg1, arg2);
 
-    // TODO
-
-    // Store result value
-    if (ok) {
-      Datum result = tree.getResult();
-      result = td.setIsFinal(result, true);
-      result = td.setValue(result, value);
-      tree.setResult(result);
-    }
+    // Store result value as final
+    Datum result = tree.getResult();
+    result = td.setIsFinal(result, true);
+    result = td.setValue(result, value);
+    tree.setResult(result);
   }
 
   Arity getArgNum(Tree& tree) {
@@ -254,36 +466,322 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
 
     return 0u;
   }
+
+  Void memoryMove(QBond.Index next) {
+    if (!hasMemory() && createMemory()) {
+      setState(cSTATE_EXEC);
+      return;
+    }
+
+    // Create next item if it doesn't exist
+    Sequence& item = getMemory();
+    if (!item.getBond(next).isBonded() && !createMemoryNext(next))
+      return;
+
+    // Move to next item
+    BondUtils bu;
+    if (bu.isOk(bu.traverse(cMEMORY, next, Sequence.cCOMMON)))
+      setState(cSTATE_EXEC);
+  }
+
+  Bool hasMemory() {
+    return getBond(cMEMORY).isBonded();
+  }
+
+  Sequence& getMemory() {
+    EventWindow ew;
+    SiteNum site = getBond(cMEMORY).getSiteNumber();
+    return (Sequence&) ew[site];
+  }
+
+  Bool createMemoryNext(QBond.Index index) {
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    // Get previous item
+    Sequence& prev = getMemory();
+    SiteNum prevSite = ew.getSiteNumber(prev);
+
+    SiteNum site = ewm.findEmptySiteAround(prev, 1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return false;
+
+    Sequence seq;
+    ew[site] = seq;
+
+    // Attach to previous item
+    QBond.Index nextIndex = (index == Sequence.cNEXT)
+      ? Sequence.cPREV
+      : Sequence.cNEXT;
+    if (!prev.getBond(index).bond(prevSite, index, site, nextIndex)) {
+      // should't happen, complain
+      DebugUtils du;
+      du.print("TreeExec.createMemory: failed to attach memory item to sequence");
+      Empty empty;
+      ew[site] = empty;
+      return false;
+    }
+    return true;
+  }
+
+  Bool createMemory() {
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    SiteNum site = ewm.findEmptySite(1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return false;
+
+    Sequence seq;
+    ew[site] = seq;
+
+    // Attach
+    if (!getBond(cMEMORY).bond(cMEMORY, site, Sequence.cCOMMON)) {
+      // should't happen, complain
+      DebugUtils du;
+      du.print("TreeExec.createMemory: failed to attach to memory item");
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return false;
+    }
+    return true;
+  }
 }
 
 
-transient TreeExecConditionals {
+local typedef TreeExec TE;
+
+transient TreeExecImpl + Fail {
   typedef TreeData.Symbol Symbol;
   typedef TreeData.Arity Arity;
   typedef TreeData.Type Type;
   typedef TreeData.Byte Byte;
 
+  typedef DataUtils.Datum Datum;
+  typedef DataUtils.Byte Byte;
+
+  TreeData td;
+}
+
+transient TreeExecConditionals : TreeExecImpl {
+  constant Symbol cSYM_IS_SET         = 0x1;
+  constant Symbol cSYM_IF_IS_SET      = 0x2;
+  constant Symbol cSYM_IF_IS_ZERO     = 0x3;
+  constant Symbol cSYM_IF_IS_ATTACHED = 0x4;
+
   Arity getArgNum(Symbol symbol) {
-    return 0u; // TODO
+    return 0u;
   }
 
-  Void  eval(TreeExec& exec, Symbol symbol, Byte arg1) {
-    // TODO
+  Arity eval(TE& exec, Symbol symbol, Byte arg1) {
+    Bool cond = false;
+
+    if (symbol == cSYM_IF_IS_SET) {
+      cond = td.hasValue(exec.mReg);
+
+    } else if (symbol == cSYM_IF_IS_ATTACHED) {
+      cond = exec.getBond(exec.mSelectedBond).isBonded();
+
+    } else if (symbol == cSYM_IF_IS_ZERO) {
+      cond = td.hasValue(exec.mReg) && (Int(8)) td.getValue(exec.mReg) == 0;
+
+    } else {
+      fail("Unknown conditional symbol");
+    }
+
+    Arity argNum = getArgNum(symbol);
+    if (argNum == 1)
+      return cond ? 1u : Arity.maxof;
+    // assert(argNum == 0);
+    return cond ? 0u : 1u;
   }
 }
 
 
-transient TreeExecFunctions {
-  typedef TreeData.Symbol Symbol;
-  typedef TreeData.Arity Arity;
-  typedef TreeData.Type Type;
-  typedef TreeData.Byte Byte;
+transient TreeExecFunctions : TreeExecImpl {
+  typedef TreeData.Integer Integer;
+
+  constant Symbol cSYM_INPUT              = 0x1;
+  constant Symbol cSYM_OUTPUT             = 0x2;
+  constant Symbol cSYM_SET                = 0x3;
+  constant Symbol cSYM_UNSET              = 0x4;
+  constant Symbol cSYM_MEMORY_PREV        = 0x5;
+  constant Symbol cSYM_MEMORY_NEXT        = 0x6;
+  constant Symbol cSYM_MEMORY_READ        = 0x7;
+  constant Symbol cSYM_MEMORY_WRITE       = 0x8;
+  constant Symbol cSYM_SELECTED_TO_MEMORY = 0xa;
+  constant Symbol cSYM_ARITY              = 0xb;
+  constant Symbol cSYM_NUM_ATTACHED       = 0xc;
+  constant Symbol cSYM_TRAVERSE           = 0xd;
+  constant Symbol cSYM_TRAVERSE_1         = 0xe;
+  constant Symbol cSYM_TRAVERSE_2         = 0xf;
+  constant Symbol cSYM_TRAVERSE_3         = 0x10;
+  constant Symbol cSYM_PROG1              = 0x11;
+  constant Symbol cSYM_PROG2              = 0x12;
+  constant Symbol cSYM_ADD                = 0x13;
+  constant Symbol cSYM_SUB                = 0x14;
+  constant Symbol cSYM_INC                = 0x15;
+  constant Symbol cSYM_DEC                = 0x16;
+  constant Symbol cSYM_BUILD              = 0x17;
+  constant Symbol cSYM_BUILD_NEXT         = 0x18;
+  constant Symbol cSYM_BUILD_NEXT_1       = 0x19;
+  constant Symbol cSYM_BUILD_NEXT_2       = 0x1a;
+  constant Symbol cSYM_BUILD_NEXT_3       = 0x1b;
+
+  EventWindow ew;
 
   Arity getArgNum(Symbol symbol) {
     return 0u; // TODO
   }
 
-  Void eval(TreeExec& exec, Symbol symbol, Byte arg1, Byte arg2) {
-    // TODO
+  Byte eval(TreeExec& exec, Symbol symbol, Byte arg1, Byte arg2) {
+    Byte ret = 0x0;
+
+    if (symbol == cSYM_INPUT) {
+      exec.selectBond(TE.cINPUT);
+
+    } else if (symbol == cSYM_OUTPUT) {
+      exec.selectBond(TE.cOUTPUT);
+
+    } else if (symbol == cSYM_SET) {
+      Datum datum = td.setValue(exec.getReg(), arg1);
+      exec.setReg(datum);
+
+    } else if (symbol == cSYM_UNSET) {
+      Datum datum = td.unsValue(exec.getReg());
+      exec.setReg(datum);
+
+    } else if (symbol == cSYM_MEMORY_PREV) {
+      exec.setState(TE.cSTATE_MEMORY_PREV);
+
+    } else if (symbol == cSYM_MEMORY_NEXT) {
+      exec.setState(TE.cSTATE_MEMORY_NEXT);
+
+    } else if (symbol == cSYM_MEMORY_READ) {
+      exec.memoryRead();
+
+    } else if (symbol == cSYM_MEMORY_WRITE) {
+      exec.setState(TE.cSTATE_MEMORY_WRITE);
+
+    } else if (symbol == cSYM_SELECTED_TO_MEMORY) {
+      exec.setState(TE.cSTATE_SELECTED_TO_MEMORY);
+
+    } else if (symbol == cSYM_ARITY) {
+      return td.getArity(getSelectedData(exec));
+
+    } else if (symbol == cSYM_NUM_ATTACHED) {
+      return getSelectedBondable(exec).getAttachedBondNum();
+
+    } else if (symbol == cSYM_TRAVERSE_1) {
+      traverse(exec, 1u);
+
+    } else if (symbol == cSYM_TRAVERSE_2) {
+      traverse(exec, 2u);
+
+    } else if (symbol == cSYM_TRAVERSE_3) {
+      traverse(exec, 3u);
+
+    } else if (symbol == cSYM_PROG1) {
+      ret = arg1;
+
+    } else if (symbol == cSYM_PROG2) {
+      ret = arg2;
+
+    } else if (symbol == cSYM_ADD) {
+      ret = add(exec, (Integer) arg1, false);
+
+    } else if (symbol == cSYM_SUB) {
+      ret = add(exec, -((Integer) arg1), false);
+
+    } else if (symbol == cSYM_INC) {
+      ret = add(exec, 1, true);
+
+    } else if (symbol == cSYM_DEC) {
+      ret = add(exec, -1, true);
+
+    } else if (symbol == cSYM_BUILD) {
+      exec.setState(TE.cSTATE_BUILD);
+
+    } else if (symbol == cSYM_BUILD_NEXT) {
+      buildNext(exec);
+
+    } else if (symbol == cSYM_BUILD_NEXT_1) {
+      buildNext(exec, 1);
+
+    } else if (symbol == cSYM_BUILD_NEXT_2) {
+      buildNext(exec, 2);
+
+    } else if (symbol == cSYM_BUILD_NEXT_3) {
+      buildNext(exec, 3);
+
+    } else {
+      fail("Unknown function symbol");
+    }
+
+    return ret;
+  }
+
+  Void traverse(TreeExec& exec) {
+    exec.setState(TE.cSTATE_TRAVERSE);
+  }
+
+  Void traverse(TreeExec& exec, QBond.Index index) {
+    Datum datum = exec.getReg();
+    datum = td.setInteger(datum, index);
+    exec.setReg(datum);
+
+    traverse(exec);
+  }
+
+  Void buildNext(TreeExec& exec) {
+    exec.setState(TE.cSTATE_BUILD_NEXT);
+  }
+
+  Void buildNext(TreeExec& exec, QBond.Index index) {
+    Datum datum = exec.getReg();
+    datum = td.setInteger(datum, index);
+    exec.setReg(datum);
+
+    buildNext(exec);
+  }
+
+  Integer add(TreeExec& exec, Integer addend, Bool retCurrent) {
+    Datum datum = exec.getReg();
+
+    Integer current = td.hasValue(datum) ? td.getInteger(datum) : 0;
+    Integer sum = (Integer) (current + addend);
+    datum = td.setInteger(datum, sum);
+    exec.setReg(datum);
+
+    return retCurrent ? current : sum;
+  }
+
+  IBondable& getSelectedBondable(TreeExec& exec) {
+    return (IBondable&) getSelectedAtom(exec);
+  }
+
+  Datum getSelectedData(TreeExec& exec) {
+    QBond& bond = exec.getSelectedBond();
+    if (!bond.isBonded())
+      return TreeData.cNODATA;
+
+    Atom& atom = ew[bond.getSiteNumber()];
+
+    if (atom as Sequence)
+      return atom.getData();
+
+    if (atom as Tree)
+      return atom.getData();
+
+    fail("TreeExec: failed to get attached data");
+    return TreeData.cNODATA;
+  }
+
+  Atom& getSelectedAtom(TreeExec& exec) {
+    QBond& bond = exec.getSelectedBond();
+    if (!bond.isBonded())
+      fail("TreeExec: selected bond is not attached");
+    return ew[bond.getSiteNumber()];
   }
 }

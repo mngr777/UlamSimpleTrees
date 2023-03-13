@@ -1,9 +1,10 @@
 quark QBond {
   typedef EventWindow.SiteNum SiteNum;
   typedef Unsigned(6) Site;
-  typedef Unsigned(3) Index;
+  typedef Unsigned(2) Index;
+  typedef Unsigned(3) Num;
 
-  constant Unsigned(3) cMAX_NUM = 4u;
+  constant Num cMAX_NUM = 4u;
   constant Unsigned(3) cMAX_DIST = 4u;
 
   Site mSite = 0u;

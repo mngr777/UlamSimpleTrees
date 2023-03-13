@@ -3,8 +3,16 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
 
   QBond mBonds[cMAX_BOND_NUM];
 
-  @Override QBond.Index getBondNum() {
+  @Override QBond.Num getBondNum() {
     return cMAX_BOND_NUM;
+  }
+
+  QBond.Num getAttachedBondNum() {
+    QBond.Num num = 0u;
+    for (Unsigned i = 0u; i < cMAX_BOND_NUM; i++)
+      if (getBond((QBond.Index) i).isBonded())
+        num++;
+    return num;
   }
 
   @Override QBond& getBond(QBond.Index index) {
@@ -14,15 +22,15 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
   }
 
   @Override Bool checkBondsForSwap(SiteNum site, SiteNum siteOther) {
-    for (QBond.Index i = 0u; i < cMAX_BOND_NUM; i++)
-      if (!getBond(i).checkForSwap(site, siteOther))
+    for (Unsigned i = 0u; i < cMAX_BOND_NUM; i++)
+      if (!getBond((QBond.Index) i).checkForSwap(site, siteOther))
         return false;
     return true;
   }
 
   @Override Void updateBondsForSwap(SiteNum site, SiteNum siteOther) {
-    for (QBond.Index i = 0u; i < cMAX_BOND_NUM; i++)
-      getBond(i).updateForSwap(site, siteOther);
+    for (Unsigned i = 0u; i < cMAX_BOND_NUM; i++)
+      getBond((QBond.Index) i).updateForSwap(site, siteOther);
   }
 
   @Override Void renderGraphics() {
@@ -30,8 +38,8 @@ quark QBondableT(Unsigned(3) cMAX_BOND_NUM = 4u): IBondable + Fail {
     if (!drawable.canDraw())
       return;
 
-    for (QBond.Index i = 0u; i < cMAX_BOND_NUM; i++) {
-      QBond& bond = mBonds[i];
+    for (Unsigned i = 0u; i < cMAX_BOND_NUM; i++) {
+      QBond& bond = mBonds[(QBond.Index) i];
       if (!bond.isBonded())
         continue;
 

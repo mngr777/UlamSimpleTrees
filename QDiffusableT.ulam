@@ -70,10 +70,10 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
     EventWindow ew;
     IBondable& bondable = (IBondable&) ew[0];
 
-    C2D coords[QBond.Index.maxof];
+    C2D coords[QBond.cMAX_NUM];
     QBond.Index coordNum = 0u;
-    for (QBond.Index i = 0u; i < bondable.getBondNum(); i++) {
-      QBond& bond = bondable.getBond(i);
+    for (Unsigned i = 0u; i < bondable.getBondNum(); i++) {
+      QBond& bond = bondable.getBond((QBond.Index) i);
       if (!bond.isBonded())
         continue;
        coords[coordNum++] = bond.getCoord();
@@ -86,7 +86,7 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
       C2D coord = ew.getCoordRaw(site);
 
       Unsigned weight = 5u;
-      for (QBond.Index i = 0u; i < coordNum; i++) {
+      for (Unsigned i = 0u; i < coordNum; i++) {
         Unsigned dist = coord.manhattanDistance(coords[i]);
         if (dist > 3u) {
           weight = 1u;
@@ -112,10 +112,10 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
 
     IBondable& bondable = (IBondable&) ew[0];
 
-    C2D staticCoords[QBond.Index.maxof];
+    C2D staticCoords[QBond.cMAX_NUM];
     Unsigned staticCoordNum = 0u;
-    for (QBond.Index i = 0u; i < bondable.getBondNum(); i++) {
-      QBond& bond = bondable.getBond(i);
+    for (Unsigned i = 0u; i < bondable.getBondNum(); i++) {
+      QBond& bond = bondable.getBond((QBond.Index) i);
       if (!bond.isBonded())
         continue;
 

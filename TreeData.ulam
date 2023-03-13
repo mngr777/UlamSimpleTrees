@@ -4,8 +4,11 @@ quark TreeData {
 
   typedef Unsigned(2) Arity;
   typedef Unsigned(2) Type;
-  typedef Byte Symbol;
 
+  typedef Byte Symbol;
+  typedef Int(8) Integer;
+
+  constant Datum cNODATA = 0x0;
   constant Byte cNIL = 0x0;
 
   constant Type cTYPE_FUNCTION = 0u;
@@ -96,8 +99,16 @@ quark TreeData {
   }
 
   Datum unsValue(Datum datum) {
-    datum = dd.setLo(datum, TreeData.cNIL);
+    datum = dd.setLo(datum, cNIL);
     datum = dd.setHi(datum, 0x0, cHAS_VALUE_MASK, cHAS_VALUE_SHIFT);
     return datum;
+  }
+
+  Integer getInteger(Datum datum) {
+    return (Integer) getValue(datum);
+  }
+
+  Datum setInteger(Datum datum, Integer value) {
+      return setValue(datum, (Byte) value);
   }
 }

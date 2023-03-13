@@ -2,8 +2,10 @@
 quark IBondable {
   typedef EventWindow.SiteNum SiteNum;
 
-  virtual QBond.Index getBondNum();
+  virtual QBond.Num getBondNum();
+  virtual QBond.Num getAttachedBondNum();
   virtual QBond& getBond(QBond.Index index);
+
   virtual Bool checkBondsForSwap(SiteNum site, SiteNum siteOther);
   virtual Void updateBondsForSwap(SiteNum site, SiteNum siteOther);
 
