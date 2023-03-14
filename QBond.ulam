@@ -32,6 +32,16 @@ quark QBond {
     return mSite != 0u;
   }
 
+  Bool isAccessible(C2D coord) {
+    EventWindow ew;
+    return ew.isAccessible(coord + getCoord());
+  }
+
+  Bool isAccessible(SiteNum site) {
+    EventWindow ew;
+    return isAccessible(ew.getCoordRaw(site));
+  }
+
   Bool bond(Index index, SiteNum siteOther, Index indexOther) {
     return bond(0u, index, siteOther, indexOther);
   }
