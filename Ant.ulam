@@ -35,6 +35,9 @@ local typedef DataUtils.Datum Datum;
 local typedef QBondableT(2u) QBondable2;
 
 /**
+   TODO: do not traverse to childred with arity 0, just peek at the data
+   and eval while attached to parent
+
    \color #ccc
  */
 element Ant : QBondable2 {
@@ -136,7 +139,8 @@ element Ant : QBondable2 {
     QBond& treeBond = getBond(cTREE);
     if (!treeBond.isBonded())
       return; // no tree too execute
-    Tree& tree = (Tree&) ew[treeBond.getSiteNumber()];
+    SiteNum treeSite = treeBond.getSiteNumber();
+    Tree& tree = (Tree&) ew[treeSite];
     Datum result = tree.getResult();
     Datum data = tree.getData();
 
@@ -189,8 +193,32 @@ element Ant : QBondable2 {
         eval(tree);
 
       } else {
-        QBond.Index index = td.hasValue(result) ? Tree.cRIGHT : Tree.cLEFT;
-        bu.traverse(cTREE, index, Tree.cCOMMON);
+        QBond.Index childIndex = td.hasValue(result) ? Tree.cRIGHT : Tree.cLEFT;
+        QBond& childBond = tree.getBond(childIndex);
+        if (!childBond.isAccessible(treeSite))
+          return;
+
+        C2D childCoord = ew.getCoordRaw(treeSite) + childBond.getCoord();
+        Tree& child = (Tree&) ew[childCoord];
+        Datum childData = child.getData();
+
+        if (getArgNum(child) == 0u && td.getType(childData) != TreeData.cTYPE_CONDITIONAL) {
+          // Evaluating the child here saves the trip back to parent
+          eval(child);
+
+          // Pass result to parent
+          Datum childResult = child.getResult();
+          // assert(td.hasValue(childResult) && td.isFinal(childResult));
+          evalOrStoreArgument(tree, td.getValue(childResult));
+
+          // Unset child value
+          childResult = td.setIsFinal(childResult, false);
+          childResult = td.unsValue(childResult);
+          child.setResult(childResult);
+
+        } else {
+          bu.traverse(cTREE, childIndex, Tree.cCOMMON);
+        }
       }
     }
   }
