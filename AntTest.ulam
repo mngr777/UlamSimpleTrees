@@ -193,9 +193,6 @@ element AntTestTrailBuilder : QMortal {
   typedef AntTrailData.Move Move;
   typedef C2D.Dir Dir;
 
-  constant Unsigned cPART_NUM = 6u;
-
-  Unsigned mPart = 0u;
   Unsigned mIndex = 0u;
 
   Dir mDir = 2u; // east
@@ -210,55 +207,13 @@ element AntTestTrailBuilder : QMortal {
       return;
     }
 
-    if (mPart >= cPART_NUM) {
+    if (mIndex == AntTrailData.cSIZE) {
       die();
       return;
     }
 
-    Move move;
-    if (mPart == 0u) {
-      AntTrailData0 part;
-      move = part.data[mIndex++];
-      if (mIndex >= AntTrailData0.cSIZE) {
-        mPart++;
-        mIndex = 0u;
-      }
-    } else if (mPart == 1u) {
-      AntTrailData1 part;
-      move = part.data[mIndex++];
-      if (mIndex >= AntTrailData1.cSIZE) {
-        mPart++;
-        mIndex = 0u;
-      }
-    } else if (mPart == 2u) {
-      AntTrailData2 part;
-      move = part.data[mIndex++];
-      if (mIndex >= AntTrailData2.cSIZE) {
-        mPart++;
-        mIndex = 0u;
-      }
-    } else if (mPart == 3u) {
-      AntTrailData3 part;
-      move = part.data[mIndex++];
-      if (mIndex >= AntTrailData3.cSIZE) {
-        mPart++;
-        mIndex = 0u;
-      }
-    } else if (mPart == 4u) {
-      AntTrailData4 part;
-      move = part.data[mIndex++];
-      if (mIndex >= AntTrailData4.cSIZE) {
-        mPart++;
-        mIndex = 0u;
-      }
-    } else if (mPart == 5u) {
-      AntTrailData5 part;
-      move = part.data[mIndex++];
-      if (mIndex >= AntTrailData5.cSIZE) {
-        mPart++;
-        mIndex = 0u;
-      }
-    }
+    AntTrailData trail;
+    Move move = trail.data[mIndex++];
     exec(move);
   }
 
@@ -378,21 +333,19 @@ transient AntSequenceData {
 }
 
 
+// Santa Fe ant trail packaged into multiple transients:
+
 transient AntTrailData {
   typedef Unsigned(2) Move;
-  typedef Unsigned(6) Size;
+  typedef Unsigned(8) Size;
 
   constant Move cFORWARD = 0u;
   constant Move cLEFT = 1u;
   constant Move cRIGHT = 2u;
   constant Move cPLACE = 3u; // move forward and place
-}
 
+  constant Size cSIZE = 167u;
 
-// Santa Fe ant trail packaged into multiple transients:
-
-transient AntTrailData0 : AntTrailData {
-  constant Size cSIZE = 32u;
   /*
       (1)
      >###
@@ -401,156 +354,56 @@ transient AntTrailData0 : AntTrailData {
         #
         #   (3)
         ####.#####
-                 #
-                 #
-                 #
-                 #
-                 #
-                 .
-                 #
-                 # (4.1)
-                 #
-                 #
-                 .
-                 .
-                 v
+                 #            (15)
+                 #           .###..
+                 #           #    #
+                 #      (13) #(14)#
+                 #       .##..    .
+                 .       .        #
+                 #       .        .
+                 #       # (12)   . (16)
+             (4) #       #        #
+                 #       #        .
+                 .       #        .
+                 .   .#...        #
+                 #   # (11)  (17) .
+                 #   #      ...###.
+                 #   .      #
+                 #   #  (18).
+                 #   .      .  (19)
+          (5)    #   .(10)  .#...
+      ..##..#####.   #          #
+      #              #          . (20)
+      #              #    (21)  .
+  (6) #     .#######..      ...#.
+      #  (8)#               #
+      .     #               x
+      .####..
+        (7)
    */
   Move data[cSIZE] = {
-    3, 3, 3, 2,                        // (1)
-    3, 3, 3, 3, 3, 1,                  // (2)
-    3, 3, 3, 0, 3, 3, 3, 3, 3, 2,      // (3)
-    3, 3, 3, 3, 3, 0, 3, 3, 3, 3, 0, 0 // (4.1)
-  };
-}
-
-transient AntTrailData1 : AntTrailData {
-  constant Size cSIZE = 27u;
-  /*
-                  v
-                  #
-                  #
-                  # (4.2)
-                  #
-                  #
-           (5)    #
-       ..##..#####.
-       #
-       #
-   (6) #
-       #
-       .
-       .>
-   */
-  Move data[cSIZE] = {
-    3, 3, 3, 3, 3, 3, 0, 2,             // (4.2)
-    3, 3, 3, 3, 3, 0, 0, 3, 3, 0, 0, 1, // (5)
-    3, 3, 3, 3, 0, 0, 1                 // (6)
-  };
-}
-
-transient AntTrailData2 : AntTrailData {
-  constant Size cSIZE = 27u;
-  /*
-                      ^
-                      #
-                      .
-                      . (10.1)
-                      #
-                      #
-                      #
-             .#######..
-         (8) #   (9)
-             #
-      >####..
-         (7)
-   */
-  Move data[cSIZE] = {
-    3, 3, 3, 3, 0, 0, 1,          // (7)
-    3, 3, 0, 2,                   // (8)
-    3, 3, 3, 3, 3, 3, 3, 0, 0, 1, // (9)
-    3, 3, 3, 0, 0, 3              // (10.1)
-  };
-}
-
-transient AntTrailData3 : AntTrailData {
-  constant Size cSIZE = 32u;
-  /*
-                                 .>
-                                 # (14)
-                            (13) #
-                             .##..
-                             .
-                             .
-                             #
-                             #
-                             # (12)
-                             #
-                             .
-                             .
-                             #
-                             #
-                         .#...
-                         # (11)
-                         #
-                  (10.2) #
-                         .
-                         ^
-   */
-  Move data[cSIZE] = {
-    0, 3, 3, 3, 0, 2,                   // (10.2)
-    3, 0, 0, 0, 1,                      // (11)
-    3, 3, 0, 0, 3, 3, 3, 3, 0, 0, 0, 2, // (12)
-    3, 3, 0, 0, 1,                      // (13)
-    3, 3, 0, 2                          // (14)
-  };
-}
-
-transient AntTrailData4 : AntTrailData {
-  constant Size cSIZE = 26u;
-  /*
-                                   (15)
-                                  >###..
-                                       #
-                                       #
-                                       .
-                                       #
-                                       .
-                                       . (16)
-                                       #
-                                       .
-                                       .
-                                       #
-                                  (17) .
-                                 ...###.
-                                 v
-   */
-  Move data[cSIZE] = {
+    3, 3, 3, 2,                            // (1)
+    3, 3, 3, 3, 3, 1,                      // (2)
+    3, 3, 3, 0, 3, 3, 3, 3, 3, 2,          // (3)
+    3, 3, 3, 3, 3, 0, 3, 3, 3, 3, 0, 0, 3, 3, 3, 3, 3, 3, 0, 2, // (4),
+    3, 3, 3, 3, 3, 0, 0, 3, 3, 0, 0, 1,    // (5)
+    3, 3, 3, 3, 0, 0, 1,                   // (6)
+    3, 3, 3, 3, 0, 0, 1,                   // (7)
+    3, 3, 0, 2,                            // (8)
+    3, 3, 3, 3, 3, 3, 3, 0, 0, 1,          // (9)
+    3, 3, 3, 0, 0, 3, 0, 3, 3, 3, 0, 2,    // (10)
+    3, 0, 0, 0, 1,                         // (11)
+    3, 3, 0, 0, 3, 3, 3, 3, 0, 0, 0, 2,    // (12)
+    3, 3, 0, 0, 1,                         // (13)
+    3, 3, 0, 2,                            // (14)
     3, 3, 3, 0, 0, 2,                      // (15)
     3, 3, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 2, // (16)
-    3, 3, 3, 0, 0, 0, 1                    // (17)
-  };
-}
-
-transient AntTrailData5 : AntTrailData {
-  constant Size cSIZE = 22u;
-  /*
-                                 v
-                                 #
-                                 .
-                            (18) .  (19)
-                                 .#...
-                                     #
-                                     . (20)
-                               (21)  .
-                                 ...#.
-                                 #
-                                 x
-   */
-  Move data[cSIZE] = {
-    3, 0, 0, 0, 1, // (18)
-    3, 0, 0, 0, 2, // (19)
-    3, 0, 0, 0, 2, // (20)
-    3, 0, 0, 0, 1, // (21)
+    3, 3, 3, 0, 0, 0, 1,                   // (17)
+    3, 0, 0, 0, 1,                         // (18)
+    3, 0, 0, 0, 2,                         // (19)
+    3, 0, 0, 0, 2,                         // (20)
+    3, 0, 0, 0, 1,                         // (21)
     3, 0
   };
 }
+
