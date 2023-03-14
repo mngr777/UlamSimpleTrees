@@ -35,9 +35,6 @@ local typedef DataUtils.Datum Datum;
 local typedef QBondableT(2u) QBondable2;
 
 /**
-   TODO: do not traverse to childred with arity 0, just peek at the data
-   and eval while attached to parent
-
    \color #ccc
  */
 element Ant : QBondable2 {
@@ -427,7 +424,7 @@ element Ant : QBondable2 {
 
   C2D getForwardCoord() {
     C2D origin;
-    return origin.neighbor(mDir); // TODO: use ew.mapSym?
+    return origin.neighbor(mDir);
   }
 
   @Override Void renderGraphics() {
