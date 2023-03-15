@@ -14,7 +14,6 @@ quark TreeData {
   constant Type cTYPE_FUNCTION = 0u;
   constant Type cTYPE_CONDITIONAL = 1u;
   constant Type cTYPE_CONSTANT = 2u;
-  constant Type cTYPE_STATE = 3u;
 
   // Data
   // arity  type unused     symbol/constant/state ref/...
