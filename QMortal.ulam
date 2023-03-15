@@ -6,8 +6,8 @@ quark QMortal {
     // Detach all bonds
     Atom& atom = ew[0];
     if (atom as IBondable) {
-      for (QBond.Index i = 0u; i < atom.getBondNum(); i++)
-        atom.getBond(i).breakup(0u);
+      for (Unsigned i = 0u; i < atom.getBondNum(); i++)
+        atom.getBond((QBond.Index) i).breakup(0u);
     }
 
     Empty empty;

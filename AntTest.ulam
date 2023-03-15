@@ -1,4 +1,7 @@
 /**
+   Sets up an artificial ant to follow the Santa Fe trail
+   (see https://en.wikipedia.org/wiki/Santa_Fe_Trail_problem)
+
    \symbol AT
    \color #00f
  */
@@ -19,12 +22,12 @@ element AntTest : QBondableT(1u) + QMortal {
       // Build next sequence item
       AntSequenceData data;
       SequenceBuilder builder;
-      Datum datum = prepareSeqData(data.data[mCount]);
-      if (builder.buildNext(ew[0], datum, cSEQUENCE))
+      Datum datum = prepareSequenceData(data.data[mCount]);
+      if (builder.buildNext(self, datum, cSEQUENCE))
         mCount++;
 
     } else {
-      // Attach the builder
+      // Attach tree builder
 
       BondUtils bu;
       EventWindowMisc ewm;
@@ -52,7 +55,7 @@ element AntTest : QBondableT(1u) + QMortal {
     }
   }
 
-  Datum prepareSeqData(Symbol symbol) {
+  Datum prepareSequenceData(Symbol symbol) {
     TreeData td;
     Datum datum = 0x0;
 
@@ -77,6 +80,9 @@ element AntTest : QBondableT(1u) + QMortal {
 
 
 /**
+   Sets up the `Ant` and `AntTrailBuilder` so the ant can find the start of the trail.
+   Attaches a mover to the input sequence to drag it away.
+
    \symbol AB
    \color #fff
  */
@@ -84,7 +90,7 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + Q
   typedef EventWindow.SiteNum SiteNum;
 
   constant State cSTATE_PLACING_MOVER = cSTATE_DONE_BUILDING; // alias
-  constant State cSTATE_PLACING_TRAIL = cSTATE_FIRST_UNRESERVED;
+  constant State cSTATE_PLACING_TRAIL = cSTATE_FIRST_UNUSED;
   constant State cSTATE_PLACING_ANT = cSTATE_PLACING_TRAIL + 1u;
   constant State cSTATE_DONE = cSTATE_PLACING_ANT + 1u;
 
@@ -95,7 +101,7 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + Q
   @Override Void behave() {
     step();
 
-    if (mState == cSTATE_DONE || mState == cSTATE_ERROR) {
+    if (getState() == cSTATE_DONE || getState() == cSTATE_ERROR) {
       die();
 
     } else if (getState() < cSTATE_PLACING_TRAIL) { // stand still when placing stuff
@@ -105,10 +111,13 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + Q
 
   Void step() {
     self.QTreeBuilder.step();
+
     if (getState() == cSTATE_PLACING_MOVER) {
       placeMover();
+
     } else if (getState() == cSTATE_PLACING_TRAIL) {
       placeTrail();
+
     } else if (getState() == cSTATE_PLACING_ANT) {
       placeAnt();
     }
@@ -186,6 +195,10 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + Q
 
 
 /**
+   Builds the Santa Fe trail of `AntFood` using data from `AntTrailData` transient.
+   The first atom in the trail is an `AntTrailStart` marker for ant's starting position
+   and direction.
+
    \symbol AP
    \color #f30
  */
@@ -293,6 +306,9 @@ element AntTestTrailBuilder : QMortal {
 }
 
 
+/**
+   A solution for the Santa Fe trail problem.
+ */
 transient AntSequenceData {
   // constant Unsigned cSIZE = 5u;
   constant Unsigned cSIZE = 17u;
@@ -333,8 +349,9 @@ transient AntSequenceData {
 }
 
 
-// Santa Fe ant trail packaged into multiple transients:
-
+/**
+   Santa Fe trail data for 
+ */
 transient AntTrailData {
   typedef Unsigned(2) Move;
   typedef Unsigned(8) Size;
