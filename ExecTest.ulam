@@ -1,0 +1,242 @@
+/**
+   \symbol ET
+   \color #00f
+ */
+element ExecTest : QBondableT(1u) + QMortal + Fail {
+  typedef DataUtils.Byte Byte;
+  typedef TreeData.Datum Datum;
+  typedef TreeData.Symbol Symbol;
+  typedef TreeData.Type Type;
+  typedef TreeData.Arity Arity;
+
+  Unsigned mCount = 0u;
+
+  constant QBond.Index cSEQUENCE = 0u;
+
+  @Override Void behave() {
+    EventWindow ew;
+
+    if (mCount < ExecTestRewindData.cSIZE) {
+      // Build next sequence item
+
+      ExecTestRewindData data;
+      SequenceBuilder builder;
+
+      Datum datum = prepareSequenceData(data.data[mCount]);
+      if (builder.buildNext(self, datum, cSEQUENCE))
+        mCount++;
+
+    } else {
+      // Attach tree builder
+
+      BondUtils bu;
+      EventWindowMisc ewm;
+
+      SiteNum site = ewm.findEmptySite(1u, QBond.cMAX_DIST);
+      if (site == SiteNum.maxof)
+        return;
+
+      ExecTestTreeBuider builder;
+      ew[site] = builder;
+
+      QBond& seqBond = getBond(cSEQUENCE);
+      SiteNum seqSite = seqBond.getSiteNumber();
+
+      // Replace ourselves with the builder
+      BondUtils.Status status = bu.replace(seqSite, seqBond.getIndex(), site, ExecTestTreeBuider.cSEQUENCE, Sequence.cCOMMON);
+      if (bu.isError(status)) {
+        fail("Failed to replace with builder");
+        return;
+
+      } else if (!bu.isOk(status)) {
+        // cleanup
+        Empty empty;
+        ew[site] = empty;
+        return;
+      }
+
+      die(); // done
+    }
+  }
+
+  Datum prepareSequenceData(ExecTestSequenceData.Item item) {
+    ExecTestSequenceData sd;
+    TreeData td;
+    TreeExec exec;
+
+    Type type = sd.getType(item);
+    Byte value = sd.getValue(item);
+    Arity arity = exec.getArity(type, (Symbol) value);
+
+    Datum datum = TreeData.cNODATA;
+    datum = td.setArity(datum, arity);
+    datum = td.setType(datum, type);
+    datum = td.setValue(datum, value);
+    return datum;
+  }
+}
+
+
+element ExecTestTreeBuider : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + QMortal + Fail {
+  constant QBond.Index cEXEC = 2u;
+
+  constant State cSTATE_PLACING_EXEC = cSTATE_DONE_BUILDING; // alias
+  constant State cSTATE_ATTACHING_PROGRAM = cSTATE_FIRST_UNUSED;
+  constant State cSTATE_DONE = cSTATE_ATTACHING_PROGRAM + 1u;
+
+  @Override IBondable& getBondable() {
+    return self;
+  }
+
+  @Override Void behave() {
+    step();
+
+    if (getState() == cSTATE_DONE || getState() == cSTATE_ERROR) {
+      die();
+
+    } else {
+      diffuse();
+    }
+  }
+
+  Void step() {
+    self.QTreeBuilder.step();
+
+    if (getState() == cSTATE_PLACING_EXEC) {
+      placeExecAndAttachSequence();
+
+    } else if (getState() == cSTATE_ATTACHING_PROGRAM) {
+      attachProgram();
+    }
+  }
+
+  Void placeExecAndAttachSequence() {
+    BondUtils bu;
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    QBond& seqBond = getBond(cSEQUENCE);
+    SiteNum site = ewm.findEmptySiteAround(seqBond.getSiteNumber(), 1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return;
+
+    TreeExec exec;
+    ew[site] = exec;
+
+    // Hold it in place by memory bond
+    // (it could also be output: we need to attach the sequence to input, and
+    // executor tries to run anything attached as program)
+    QBond& execBond = getBond(cEXEC);
+    if (!execBond.bond(0u, cEXEC, site, TreeExec.cMEMORY)) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return;
+    }
+
+    // Transfer input sequence to exec.
+    BondUtils.Status status = bu.transfer(0u, cSEQUENCE, site, TreeExec.cINPUT, Sequence.cCOMMON);
+    if (bu.isError(status)) {
+      fail("ExecTestTreeBuilder.placeExecAndAttachSequence: failed to transfer input sequence to executor");
+      return;
+
+    } else if (!bu.isOk(status)) {
+      // TEST
+      DebugUtils du;
+      du.print("retrying sequence transfer");
+
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return;
+    }
+
+    setState(cSTATE_ATTACHING_PROGRAM);
+  }
+
+  Void attachProgram() {
+    BondUtils bu;
+    EventWindow ew;
+
+    QBond& execBond = getBond(cEXEC);
+    SiteNum execSite = execBond.getSiteNumber();
+
+    // Transfer the tree to the executor
+    BondUtils.Status status = bu.transfer(0u, cTREE, execSite, TreeExec.cPROGRAM, Tree.cCOMMON);
+    if (bu.isError(status)) {
+      fail("ExecTestTreeBuilder.attachProgram: failed to transfer program tree to executor");
+      return;
+
+    } else if (bu.isOk(status)) {
+      // TEST
+      DebugUtils du;
+      du.print("program transferred");
+
+      setState(cSTATE_DONE);
+    } else {
+      // TEST
+      DebugUtils du;
+      du.print("retrying program transfer");
+    }
+  }
+}
+
+
+transient ExecTestSequenceData {
+  typedef DataUtils.Byte Byte;
+  typedef TreeData.Type Type;
+  typedef Bits(5) Value;
+  typedef Bits(Type.sizeof + Value.sizeof) Item;
+
+  typedef Unsigned(6) Size;
+
+  constant Item cFUNC = TreeData.cTYPE_FUNCTION << Value.sizeof;
+  constant Item cCOND = TreeData.cTYPE_CONDITIONAL << Value.sizeof;
+  constant Item cCNST = TreeData.cTYPE_CONSTANT << Value.sizeof;
+
+  /*
+    Item:
+
+      type    Value
+      v       v
+    | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+   */
+
+  Type getType(Item item) {
+    return (Type) (item >> Value.sizeof);
+  }
+
+  Byte getValue(Item item) {
+    return ((Byte) item) & 0b00011111;
+  }
+}
+
+
+local typedef TreeExecFunctions EF;
+local typedef TreeExecConditionals EC;
+
+/*
+  Moving to the beginning of sequence
+
+  (prog2
+    (input)
+    (prog2
+      (set (quote 1)
+      (if-has-attached
+        (traverse)
+        (noop)))))
+*/
+transient ExecTestRewindData : ExecTestSequenceData {
+  constant Size cSIZE = 8u;
+
+  Item data[cSIZE] = {
+    /* */ cFUNC | (Value) EF.cSYMBOL_PROG2,
+    /*     */ cFUNC | (Value) EF.cSYMBOL_INPUT,
+    /*     */ cFUNC | (Value) EF.cSYMBOL_PROG2,
+    /*         */ cFUNC | (Value) EF.cSYMBOL_SET,
+    /*             */ cCNST | (Value) 1u,
+    /*         */ cCOND | (Value) EC.cSYMBOL_IF_HAS_ATTACHED,
+    /*             */ cFUNC | (Value) EF.cSYMBOL_TRAVERSE,
+    /*             */ cFUNC | (Value) EF.cSYMBOL_NOOP
+  };
+}
