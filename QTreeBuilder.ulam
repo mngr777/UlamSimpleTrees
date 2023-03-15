@@ -8,17 +8,17 @@ quark QTreeBuilder {
   constant QBond.Index cTREE = 1u;
 
   constant State cSTATE_READY            = 0u;
-  constant State cSTATE_REWINDING        = 1u;
-  constant State cSTATE_BUILDING         = 2u;
-  constant State cSTATE_ADVANCING        = 3u;
-  constant State cSTATE_MOVING_UP        = 4u;
-  constant State cSTATE_MOVING_DOWN      = 5u;
-  constant State cSTATE_DONE_BUILDING    = 6u;
-  constant State cSTATE_ERROR            = 7u;
-  constant State cSTATE_FIRST_UNRESERVED = cSTATE_ERROR + 1;
+  constant State cSTATE_ERROR            = 1u;
+  constant State cSTATE_REWINDING        = 2u;
+  constant State cSTATE_BUILDING         = 3u;
+  constant State cSTATE_ADVANCING        = 4u;
+  constant State cSTATE_MOVING_UP        = 5u;
+  constant State cSTATE_MOVING_DOWN      = 6u;
+  constant State cSTATE_DONE_BUILDING    = 7u;
+  constant State cSTATE_FIRST_UNUSED = cSTATE_DONE_BUILDING + 1;
 
   State mState = cSTATE_READY;
-  TreeData.Arity mDownChildIndex = TreeData.Arity.maxof;
+  TreeData.Arity mDownChildIndex = TreeData.Arity.maxof; // TODO: use QBond.Index
 
   virtual IBondable& getBondable();
 
