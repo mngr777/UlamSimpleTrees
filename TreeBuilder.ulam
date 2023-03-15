@@ -1,6 +1,8 @@
 local typedef BondUtils BU;
 
 /**
+   Default tree builder.
+
     \symbol TB
     \symmetry all
  */
