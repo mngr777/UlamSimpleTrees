@@ -2,7 +2,10 @@
    "Universal" interpreter
 
    TODO: do not traverse to childred with arity 0, just peek at the data
-   and eval while attached to parent
+   and eval while attached to parent, see `Ant`
+
+   NOTE: `build` and `buildNext` always build trees. It's ok, `Tree` and `Sequence`
+   are supposed to be a single type for data structures.
 
    \symbol TE
  */
@@ -36,8 +39,8 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
 
   State mState;
 
-  Datum mReg;
-  Datum mReg1; // unused
+  Datum mReg1;
+  Datum mReg2;
 
   QBond.Index mSelectedBond = cINPUT;
 
@@ -45,20 +48,34 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     mState = state;
   }
 
-  Datum getReg() {
-    return mReg;
+  Datum getReg1() {
+    return mReg1;
   }
 
-  Void setReg(Datum datum) {
-    mReg = datum;
+  Void setReg1(Datum datum) {
+    mReg1 = datum;
   }
 
-  Void selectBond(QBond.Index index) {
+  Datum getReg2() {
+    return mReg2;
+  }
+
+  Void setReg2(Datum datum) {
+    mReg2 = datum;
+  }
+
+  QBond.Index selectBond(QBond.Index index) {
+    QBond.Index old = mSelectedBond;
     mSelectedBond = index;
+    return old;
   }
 
   QBond& getSelectedBond() {
     return getBond(mSelectedBond);
+  }
+
+  Void detachSelectedBond() {
+    getSelectedBond().breakup();
   }
 
   @Override Void behave() {
@@ -96,15 +113,14 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
   }
 
   Void init() {
+    BondUtils bu;
+    EventWindow ew;
+
     QBond& treeBond = getBond(cPROGRAM);
     if (!treeBond.isBonded())
       return;
 
     // Move to root
-
-    BondUtils bu;
-    EventWindow ew;
-
     Tree& tree = (Tree&) ew[treeBond.getSiteNumber()];
     if (!tree.isRoot()) {
       bu.traverse(cPROGRAM, Tree.cPARENT, Tree.cCOMMON);
@@ -154,7 +170,7 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
       return;
 
     Sequence& item = getMemory();
-    item.setData(getReg());
+    item.setData(getReg1());
 
     setState(cSTATE_EXEC);
   }
@@ -164,7 +180,7 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     Datum datum = hasMemory()
       ? getMemory().getData()
       : TreeData.cNODATA;
-    setReg(datum);
+    setReg1(datum);
   }
 
   Void selectedToMemory() {
@@ -217,7 +233,7 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     output.breakup();
 
     // Attach
-    if (!output.bond(cOUTPUT, site, Sequence.cCOMMON)) {
+    if (!output.bond(cOUTPUT, site, Tree.cCOMMON)) {
       // shouldn't happen, complain
       du.print("TreeExec.build: failed to attach to built root");
 
@@ -236,13 +252,20 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     EventWindowMisc ewm;
     TreeData td;
 
-    // Get parent bond index from register
-    if (!td.hasValue(getReg())) {
-      du.print("TreeExec.buildNext: register is empty");
+    // Get current bond index from register
+    if (!td.hasValue(getReg1())) {
+      du.print("TreeExec.buildNext: register 1 (current bond index) is empty");
       setState(cSTATE_ERROR);
       return;
     }
-    QBond.Index parentIndex = (QBond.Index) td.getInteger(getReg());
+    QBond.Index currentIndex = (QBond.Index) td.getInteger(getReg1());
+
+    if (!td.hasValue(getReg2())) {
+      du.print("TreeExec.buildNext: register 2 (next bond index) is empty");
+      setState(cSTATE_ERROR);
+      return;
+    }
+    QBond.Index nextIndex = (QBond.Index) td.getInteger(getReg2());
 
     // Get data from memory
     if (!hasMemory()) {
@@ -252,43 +275,42 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     }
     Datum data = getMemory().getData();
 
-    // Get parent site
+    // Get current site
     QBond& output = getBond(cOUTPUT);
     if (!output.isBonded()) {
       du.print("TreeExec.buildNext: output is empty");
       setState(cSTATE_ERROR);
     }
-    SiteNum parentSite = output.getSiteNumber();
-    Tree& parent = (Tree&) ew[parentSite];
+    SiteNum currentSite = output.getSiteNumber();
+    Tree& current = (Tree&) ew[currentSite];
 
     // Build
-    SiteNum site = ewm.findEmptySiteAround(parent, 1u, QBond.cMAX_DIST);
-    if (site == SiteNum.maxof)
+    SiteNum nextSite = ewm.findEmptySiteAround(current, 1u, QBond.cMAX_DIST);
+    if (nextSite == SiteNum.maxof)
       return;
-    Tree child;
-    child.setData(data);
-    ew[site] = child;
+    Tree next;
+    next.setData(data);
+    ew[nextSite] = next;
 
     Bool ok = true;
 
-    // Detach from parent
+    // Detach from current
     ok = output.breakup();
     if (!ok)
       du.print("TreeExec.buildNext: failed to detach from current output");
 
-    // Attach child to parent
-    // TODO: allow to select child bond index (use second register for the argument?)
+    // Attach next to current
     if (ok) {
-      QBond& parentBond = parent.getBond(parentIndex);
-      ok = parentBond.bond(parentSite, parentIndex, site, Tree.cPARENT);
+      QBond& currentBond = current.getBond(currentIndex);
+      ok = currentBond.bond(currentSite, currentIndex, nextSite, nextIndex);
       if (!ok)
-        du.print("TreeExec.buildNext: failed to attach child to parent");
+        du.print("TreeExec.buildNext: failed to attach next item to current");
     }
 
     if (!ok) {
       // cleanup
       Empty empty;
-      ew[site] = empty;
+      ew[nextSite] = empty;
       return;
     }
 
@@ -301,12 +323,12 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     TreeData td;
 
     // Get index from register
-    if (!td.hasValue(getReg())) {
+    if (!td.hasValue(getReg1())) {
       du.print("TreeExec.traverse: register is empty");
       setState(cSTATE_ERROR);
       return;
     }
-    QBond.Index index = (QBond.Index) td.getInteger(getReg());
+    QBond.Index index = (QBond.Index) td.getInteger(getReg1());
 
     // Get current item
     QBond& bond = getSelectedBond();
@@ -340,7 +362,6 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
     if (tree.isRoot()) {
       // mState = cSTATE_DONE;
 
-      // TEST
       DebugUtils du;
       du.print("restarting program");
 
@@ -536,8 +557,9 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
   }
 
   Void memoryMove(QBond.Index next) {
-    if (!hasMemory() && createMemory()) {
-      setState(cSTATE_EXEC);
+    if (!hasMemory()) {
+      if (createMemory())
+        setState(cSTATE_EXEC);
       return;
     }
 
@@ -669,18 +691,20 @@ transient TreeExecImpl + Fail {
 }
 
 transient TreeExecConditionals : TreeExecImpl {
-  constant Symbol cSYMBOL_IS_SET          = 0x1;
-  constant Symbol cSYMBOL_IF_IS_SET       = 0x2;
-  constant Symbol cSYMBOL_IF_IS_ZERO      = 0x3;
-  constant Symbol cSYMBOL_IF_IS_ATTACHED  = 0x4;
+  constant Symbol cSYMBOL_IF_SET       = 0x1; // alias
+  constant Symbol cSYMBOL_IF_SET_1     = 0x1;
+  constant Symbol cSYMBOL_IF_SET_2     = 0x2;
+  constant Symbol cSYMBOL_IF_ZERO      = 0x3;
+  constant Symbol cSYMBOL_IF_ATTACHED  = 0x4;
   constant Symbol cSYMBOL_IF_HAS_ATTACHED = 0x5;
+  constant Symbol cSYMBOL_IF_INPUT_HAS_ATTACHED = 0x6; // redundant?
 
   Arity getArgNum(Symbol symbol) {
     return 0u;
   }
 
   Arity getArity(Symbol symbol) {
-    return 2u; // TODO: maybe allow having one branch (or just add no-op for unused)
+    return 2u; // TODO: maybe allow having a single branch (or just add a no-op for unused one)
   }
 
   Arity eval(TE& exec, Symbol symbol, Byte arg1) {
@@ -689,21 +713,32 @@ transient TreeExecConditionals : TreeExecImpl {
 
     Bool cond = false;
 
-    if (symbol == cSYMBOL_IF_IS_SET) {
-      if (verbose) du.print("if-is-set");
-      cond = td.hasValue(exec.mReg);
+    if (symbol == cSYMBOL_IF_SET || symbol == cSYMBOL_IF_SET_1) {
+      if (verbose) du.print("if-set-1");
+      cond = td.hasValue(exec.getReg1());
 
-    } else if (symbol == cSYMBOL_IF_IS_ATTACHED) {
-      if (verbose) du.print("if-is-attached");
+    } else if (symbol == cSYMBOL_IF_SET_2) {
+      if (verbose) du.print("if-set-2");
+      cond = td.hasValue(exec.getReg2());
+
+    } else if (symbol == cSYMBOL_IF_ATTACHED) {
+      if (verbose) du.print("if-attached");
       cond = exec.getBond(exec.mSelectedBond).isBonded();
 
-    } else if (symbol == cSYMBOL_IF_IS_ZERO) {
-      if (verbose) du.print("if-is-zero");
-      cond = td.hasValue(exec.mReg) && (Int(8)) td.getValue(exec.mReg) == 0;
+    } else if (symbol == cSYMBOL_IF_ZERO) {
+      if (verbose) du.print("if-zero");
+      cond = td.hasValue(exec.getReg1())
+        && (Int(8)) td.getValue(exec.getReg1()) == 0;
 
     } else if (symbol == cSYMBOL_IF_HAS_ATTACHED) {
       if (verbose) du.print("if-has-attached");
       cond = hasAttached(exec);
+
+    } else if (symbol == cSYMBOL_IF_INPUT_HAS_ATTACHED) {
+      if (verbose) du.print("if-input-has-attached");
+      QBond.Index selected = exec.selectBond(TreeExec.cINPUT);
+      hasAttached(exec);
+      exec.selectBond(selected);
 
     } else {
       fail("Unknown conditional symbol");
@@ -722,11 +757,11 @@ transient TreeExecConditionals : TreeExecImpl {
     if (!hasSelected(exec))
       return false;
 
-    if (!td.hasValue(exec.getReg()))
+    if (!td.hasValue(exec.getReg1()))
       return false;
 
     IBondable& bondable = getSelectedBondable(exec);
-    QBond.Index index = (QBond.Index) td.getInteger(exec.getReg());
+    QBond.Index index = (QBond.Index) td.getInteger(exec.getReg1());
     if (index > bondable.getBondNum())
       return false;
 
@@ -740,31 +775,36 @@ transient TreeExecFunctions : TreeExecImpl {
 
   constant Symbol cSYMBOL_INPUT              = 0x1;
   constant Symbol cSYMBOL_OUTPUT             = 0x2;
-  constant Symbol cSYMBOL_SET                = 0x3;
-  constant Symbol cSYMBOL_UNSET              = 0x4;
-  constant Symbol cSYMBOL_MEMORY_PREV        = 0x5;
-  constant Symbol cSYMBOL_MEMORY_NEXT        = 0x6;
-  constant Symbol cSYMBOL_MEMORY_READ        = 0x7;
-  constant Symbol cSYMBOL_MEMORY_WRITE       = 0x8;
-  constant Symbol cSYMBOL_SELECTED_TO_MEMORY = 0xa;
-  constant Symbol cSYMBOL_ARITY              = 0xb;
-  constant Symbol cSYMBOL_NUM_ATTACHED       = 0xc;
-  constant Symbol cSYMBOL_TRAVERSE           = 0xd;
-  constant Symbol cSYMBOL_TRAVERSE_1         = 0xe;
-  constant Symbol cSYMBOL_TRAVERSE_2         = 0xf;
-  constant Symbol cSYMBOL_TRAVERSE_3         = 0x10;
-  constant Symbol cSYMBOL_PROG1              = 0x11;
-  constant Symbol cSYMBOL_PROG2              = 0x12;
-  constant Symbol cSYMBOL_ADD                = 0x13;
-  constant Symbol cSYMBOL_SUB                = 0x14;
-  constant Symbol cSYMBOL_INC                = 0x15;
-  constant Symbol cSYMBOL_DEC                = 0x16;
-  constant Symbol cSYMBOL_BUILD              = 0x17;
-  constant Symbol cSYMBOL_BUILD_NEXT         = 0x18;
-  constant Symbol cSYMBOL_BUILD_NEXT_1       = 0x19;
-  constant Symbol cSYMBOL_BUILD_NEXT_2       = 0x1a;
-  constant Symbol cSYMBOL_BUILD_NEXT_3       = 0x1b;
-  constant Symbol cSYMBOL_NOOP               = 0x1c;
+  constant Symbol cSYMBOL_SET_1              = 0x3;
+  constant Symbol cSYMBOL_UNSET_1            = 0x4;
+  constant Symbol cSYMBOL_SET_2              = 0x5;
+  constant Symbol cSYMBOL_UNSET_2            = 0x6;
+  constant Symbol cSYMBOL_MEMORY_PREV        = 0x7;
+  constant Symbol cSYMBOL_MEMORY_NEXT        = 0x8;
+  constant Symbol cSYMBOL_MEMORY_READ        = 0x9;
+  constant Symbol cSYMBOL_MEMORY_WRITE       = 0xa;
+  constant Symbol cSYMBOL_SELECTED_TO_MEMORY = 0xb;
+  constant Symbol cSYMBOL_ARITY              = 0xd;
+  constant Symbol cSYMBOL_NUM_ATTACHED       = 0xe;
+  constant Symbol cSYMBOL_TRAVERSE           = 0xf;
+  constant Symbol cSYMBOL_TRAVERSE_1         = 0x10;
+  constant Symbol cSYMBOL_TRAVERSE_2         = 0x11;
+  constant Symbol cSYMBOL_TRAVERSE_3         = 0x12;
+  constant Symbol cSYMBOL_PROG1              = 0x13;
+  constant Symbol cSYMBOL_PROG2              = 0x14;
+  constant Symbol cSYMBOL_ADD                = 0x15;
+  constant Symbol cSYMBOL_SUB                = 0x16;
+  constant Symbol cSYMBOL_INC                = 0x17;
+  constant Symbol cSYMBOL_DEC                = 0x18;
+  constant Symbol cSYMBOL_BUILD              = 0x19;
+  constant Symbol cSYMBOL_BUILD_NEXT         = 0x1a;
+  constant Symbol cSYMBOL_BUILD_NEXT_1       = 0x1b;
+  constant Symbol cSYMBOL_BUILD_NEXT_2       = 0x1c;
+  constant Symbol cSYMBOL_BUILD_NEXT_3       = 0x1d;
+  constant Symbol cSYMBOL_NOOP               = 0x1e;
+  constant Symbol cSYMBOL_DETACH             = 0x1f;
+  constant Symbol cSYMBOL_DETACH_INPUT       = 0x20;
+  constant Symbol cSYMBOL_DETACH_OUTPUT      = 0x21;
 
   Arity getArgNum(Symbol symbol) {
     if (symbol == cSYMBOL_PROG1 ||
@@ -773,7 +813,8 @@ transient TreeExecFunctions : TreeExecImpl {
       return 2u;
     }
 
-    if (symbol == cSYMBOL_SET ||
+    if (symbol == cSYMBOL_SET_1 ||
+        symbol == cSYMBOL_SET_2 ||
         symbol == cSYMBOL_ADD ||
         symbol == cSYMBOL_SUB)
     {
@@ -801,15 +842,25 @@ transient TreeExecFunctions : TreeExecImpl {
       if (verbose) du.print("output");
       exec.selectBond(TE.cOUTPUT);
 
-    } else if (symbol == cSYMBOL_SET) {
-      if (verbose) du.print("set");
-      Datum datum = td.setValue(exec.getReg(), arg1);
-      exec.setReg(datum);
+    } else if (symbol == cSYMBOL_SET_1) {
+      if (verbose) du.print("set-1");
+      Datum datum = td.setValue(exec.getReg1(), arg1);
+      exec.setReg1(datum);
 
-    } else if (symbol == cSYMBOL_UNSET) {
-      if (verbose) du.print("unset");
-      Datum datum = td.unsValue(exec.getReg());
-      exec.setReg(datum);
+    } else if (symbol == cSYMBOL_UNSET_1) {
+      if (verbose) du.print("unset-1");
+      Datum datum = td.unsValue(exec.getReg1());
+      exec.setReg1(datum);
+
+    } else if (symbol == cSYMBOL_SET_2) {
+      if (verbose) du.print("set-2");
+      Datum datum = td.setValue(exec.getReg2(), arg2);
+      exec.setReg2(datum);
+
+    } else if (symbol == cSYMBOL_UNSET_2) {
+      if (verbose) du.print("unset-2");
+      Datum datum = td.unsValue(exec.getReg2());
+      exec.setReg2(datum);
 
     } else if (symbol == cSYMBOL_MEMORY_PREV) {
       if (verbose) du.print("memory-prev");
@@ -856,11 +907,11 @@ transient TreeExecFunctions : TreeExecImpl {
       traverse(exec, 3u);
 
     } else if (symbol == cSYMBOL_PROG1) {
-      if (verbose) du.print("prog1");
+      // if (verbose) du.print("prog1");
       ret = arg1;
 
     } else if (symbol == cSYMBOL_PROG2) {
-      if (verbose) du.print("prog2");
+      // if (verbose) du.print("prog2");
       ret = arg2;
 
     } else if (symbol == cSYMBOL_ADD) {
@@ -903,6 +954,22 @@ transient TreeExecFunctions : TreeExecImpl {
       if (verbose) du.print("noop");
       // do nothing
 
+    } else if (symbol == cSYMBOL_DETACH) {
+      if (verbose) du.print("detach");
+      exec.detachSelectedBond();
+
+    } else if (symbol == cSYMBOL_DETACH_INPUT) {
+      if (verbose) du.print("detach-input");
+      QBond.Index selected = exec.selectBond(TreeExec.cINPUT);
+      exec.detachSelectedBond();
+      exec.selectBond(selected);
+
+    } else if (symbol == cSYMBOL_DETACH_OUTPUT) {
+      if (verbose) du.print("detach-output");
+      QBond.Index selected = exec.selectBond(TreeExec.cOUTPUT);
+      exec.detachSelectedBond();
+      exec.selectBond(selected);
+
     } else {
       // DebugUtils du;
       // du.print("Unknown function symbol:");
@@ -918,9 +985,9 @@ transient TreeExecFunctions : TreeExecImpl {
   }
 
   Void traverse(TreeExec& exec, QBond.Index index) {
-    Datum datum = exec.getReg();
+    Datum datum = exec.getReg1();
     datum = td.setInteger(datum, index);
-    exec.setReg(datum);
+    exec.setReg1(datum);
 
     traverse(exec);
   }
@@ -930,20 +997,20 @@ transient TreeExecFunctions : TreeExecImpl {
   }
 
   Void buildNext(TreeExec& exec, QBond.Index index) {
-    Datum datum = exec.getReg();
+    Datum datum = exec.getReg1();
     datum = td.setInteger(datum, index);
-    exec.setReg(datum);
+    exec.setReg1(datum);
 
     buildNext(exec);
   }
 
   Integer add(TreeExec& exec, Integer addend, Bool retCurrent) {
-    Datum datum = exec.getReg();
+    Datum datum = exec.getReg1();
 
     Integer current = td.hasValue(datum) ? td.getInteger(datum) : 0;
     Integer sum = (Integer) (current + addend);
     datum = td.setInteger(datum, sum);
-    exec.setReg(datum);
+    exec.setReg1(datum);
 
     return retCurrent ? current : sum;
   }

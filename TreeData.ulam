@@ -28,7 +28,7 @@ quark TreeData {
   constant Unsigned cTYPE_SHIFT = 4u;
 
   // Result
-  // (either final result or 1st argument)
+  // (either final result of `Tree` node evaluation or stored 1st argument)
   //
   //  unused       final?  value
   //   v             v       v

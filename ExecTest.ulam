@@ -1,65 +1,131 @@
 /**
-   \symbol ET
+   Dummy element matching file name to keep compiler happy 
+
+   \placeable no
+ */
+element ExecTest {}
+
+/**
+   \symbol E1
    \color #00f
  */
-element ExecTest : QBondableT(1u) + QMortal + Fail {
+element ExecDemo1_RewindSequence : QExecTest(1u) + QBondableT(1u) + QMortal + Fail {
+  @Override Void behave() {
+    if (buildNext(self) && attachTreeBuilder(self))
+      die();
+  }
+}
+
+/**
+   \symbol E2
+   \color #00f
+ */
+element ExecDemo2_CopySequenceToMemory : QExecTest(2u) + QBondableT(1u) + QMortal + Fail {
+  @Override Void behave() {
+    if (buildNext(self) && attachTreeBuilder(self))
+      die();
+  }
+}
+
+
+/**
+   Shared demo code, stage 1:
+   - build selected sequence;
+   - attach `ExecTestTreeBuilder` to set up stage 2
+ */
+quark QExecTest(Unsigned cDEMO = 1u) {
+  typedef EventWindow.SiteNum SiteNum;
+
   typedef DataUtils.Byte Byte;
   typedef TreeData.Datum Datum;
   typedef TreeData.Symbol Symbol;
   typedef TreeData.Type Type;
   typedef TreeData.Arity Arity;
 
-  Unsigned mCount = 0u;
+  typedef ExecTestSequenceData.Size Size;
+  typedef ExecTestSequenceData.Item Item;
 
-  constant QBond.Index cSEQUENCE = 0u;
+  constant QBond.Index cOUTPUT= 0u;
 
-  @Override Void behave() {
+  Size mCount = 0u;
+
+  Bool buildNext(Atom& demo) {
+    if (mCount >= getDataSize())
+      return true;
+
+    SequenceBuilder builder;
+    Datum data = getData(mCount);
+    if (builder.buildNext(demo, data, cOUTPUT))
+      mCount++;
+    return false;
+  }
+
+  Bool attachTreeBuilder(Atom& demo) {
+    BondUtils bu;
     EventWindow ew;
+    EventWindowMisc ewm;
 
-    if (mCount < ExecTestRewindData.cSIZE) {
-      // Build next sequence item
+    SiteNum site = ewm.findEmptySite(1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return false;
 
-      ExecTestRewindData data;
-      SequenceBuilder builder;
+    ExecTestTreeBuilder builder;
+    ew[site] = builder;
 
-      Datum datum = prepareSequenceData(data.data[mCount]);
-      if (builder.buildNext(self, datum, cSEQUENCE))
-        mCount++;
+    IBondable& bondable = (IBondable&) demo;
+    QBond& seqBond = bondable.getBond(cOUTPUT);
+    SiteNum seqSite = seqBond.getSiteNumber();
+
+    // Replace demo with the builder
+    BondUtils.Status status = bu.replace(seqSite, seqBond.getIndex(), site, ExecTestTreeBuilder.cSEQUENCE, Sequence.cCOMMON);
+    if (bu.isError(status)) {
+      Fail fl;
+      fl.fail("Failed to replace with builder");
+      return false;
+
+    } else if (!bu.isOk(status)) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return false;
+    }
+    return true;
+  }
+
+  Size getDataSize() {
+    if (cDEMO == 1u) {
+      return ExecTestRewindData.cSIZE;
+
+    } else if (cDEMO == 2u) {
+      return ExecTestCopyData.cSIZE;
 
     } else {
-      // Attach tree builder
-
-      BondUtils bu;
-      EventWindowMisc ewm;
-
-      SiteNum site = ewm.findEmptySite(1u, QBond.cMAX_DIST);
-      if (site == SiteNum.maxof)
-        return;
-
-      ExecTestTreeBuider builder;
-      ew[site] = builder;
-
-      QBond& seqBond = getBond(cSEQUENCE);
-      SiteNum seqSite = seqBond.getSiteNumber();
-
-      // Replace ourselves with the builder
-      BondUtils.Status status = bu.replace(seqSite, seqBond.getIndex(), site, ExecTestTreeBuider.cSEQUENCE, Sequence.cCOMMON);
-      if (bu.isError(status)) {
-        fail("Failed to replace with builder");
-        return;
-
-      } else if (!bu.isOk(status)) {
-        // cleanup
-        Empty empty;
-        ew[site] = empty;
-        return;
-      }
-
-      die(); // done
+      Fail fl;
+      fl.fail("Invalid demo number");
+      return 0u;
     }
   }
 
-  Datum prepareSequenceData(ExecTestSequenceData.Item item) {
+  Datum getData(Size num) {
+    Item item = 0x0;
+
+    if (cDEMO == 1u) {
+      ExecTestRewindData data;
+      item = data.data[num];
+
+    } else if (cDEMO == 2u) {
+      ExecTestCopyData data;
+      item =  data.data[num];
+
+    } else {
+      Fail fl;
+      fl.fail("Invalid demo number");
+    }
+
+    return prepareSequenceData(item);
+  }
+
+  Datum prepareSequenceData(Item item) {
     ExecTestSequenceData sd;
     TreeData td;
     TreeExec exec;
@@ -77,7 +143,15 @@ element ExecTest : QBondableT(1u) + QMortal + Fail {
 }
 
 
-element ExecTestTreeBuider : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + QMortal + Fail {
+/**
+   Setting up stage 2:
+   - build a tree from the sequence;
+   - attach the tree to a "general purpose" executor `TreeExec`;
+   - attach the sequence to the executor as input (reusing the original sequence for simplicity)
+
+   \symbol EB
+ */
+element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + QMortal + Fail {
   constant QBond.Index cEXEC = 2u;
 
   constant State cSTATE_PLACING_EXEC = cSTATE_DONE_BUILDING; // alias
@@ -112,8 +186,11 @@ element ExecTestTreeBuider : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u)
 
   Void placeExecAndAttachSequence() {
     BondUtils bu;
+    DebugUtils du;
     EventWindow ew;
     EventWindowMisc ewm;
+
+    du.print("placing executor");
 
     QBond& seqBond = getBond(cSEQUENCE);
     SiteNum site = ewm.findEmptySiteAround(seqBond.getSiteNumber(), 1u, QBond.cMAX_DIST);
@@ -134,17 +211,16 @@ element ExecTestTreeBuider : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u)
       return;
     }
 
-    // Transfer input sequence to exec.
+
+    // transfer input sequence to exec.
+    du.print("transferring input sequence to executor");
     BondUtils.Status status = bu.transfer(0u, cSEQUENCE, site, TreeExec.cINPUT, Sequence.cCOMMON);
     if (bu.isError(status)) {
       fail("ExecTestTreeBuilder.placeExecAndAttachSequence: failed to transfer input sequence to executor");
       return;
 
     } else if (!bu.isOk(status)) {
-      // TEST
-      DebugUtils du;
       du.print("retrying sequence transfer");
-
       // cleanup
       Empty empty;
       ew[site] = empty;
@@ -185,29 +261,28 @@ element ExecTestTreeBuider : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u)
 transient ExecTestSequenceData {
   typedef DataUtils.Byte Byte;
   typedef TreeData.Type Type;
-  typedef Bits(5) Value;
-  typedef Bits(Type.sizeof + Value.sizeof) Item;
+  typedef Bits(Type.sizeof + Byte.sizeof) Item;
 
   typedef Unsigned(6) Size;
 
-  constant Item cFUNC = TreeData.cTYPE_FUNCTION << Value.sizeof;
-  constant Item cCOND = TreeData.cTYPE_CONDITIONAL << Value.sizeof;
-  constant Item cCNST = TreeData.cTYPE_CONSTANT << Value.sizeof;
+  constant Item cFUNC = TreeData.cTYPE_FUNCTION << Byte.sizeof;
+  constant Item cCOND = TreeData.cTYPE_CONDITIONAL << Byte.sizeof;
+  constant Item cCNST = TreeData.cTYPE_CONSTANT << Byte.sizeof;
 
   /*
     Item:
 
-      type    Value
+      type    value
       v       v
-    | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
    */
 
   Type getType(Item item) {
-    return (Type) (item >> Value.sizeof);
+    return (Type) (item >> Byte.sizeof);
   }
 
   Byte getValue(Item item) {
-    return ((Byte) item) & 0b00011111;
+    return (Byte) item;
   }
 }
 
@@ -215,28 +290,72 @@ transient ExecTestSequenceData {
 local typedef TreeExecFunctions EF;
 local typedef TreeExecConditionals EC;
 
-/*
-  Moving to the beginning of sequence
+/**
+  Moving to the beginning of input sequence.
 
   (prog2
-    (input)
+    (input) ; select input sequence
     (prog2
-      (set (quote 1)
+      (set-1
+        (quote 1) ; prev. item bond index
       (if-has-attached
-        (traverse)
+        (traverse) ; move to prev. item
         (noop)))))
 */
 transient ExecTestRewindData : ExecTestSequenceData {
   constant Size cSIZE = 8u;
 
   Item data[cSIZE] = {
-    /* */ cFUNC | (Value) EF.cSYMBOL_PROG2,
-    /*     */ cFUNC | (Value) EF.cSYMBOL_INPUT,
-    /*     */ cFUNC | (Value) EF.cSYMBOL_PROG2,
-    /*         */ cFUNC | (Value) EF.cSYMBOL_SET,
-    /*             */ cCNST | (Value) 1u,
-    /*         */ cCOND | (Value) EC.cSYMBOL_IF_HAS_ATTACHED,
-    /*             */ cFUNC | (Value) EF.cSYMBOL_TRAVERSE,
-    /*             */ cFUNC | (Value) EF.cSYMBOL_NOOP
+    /* */ cFUNC | EF.cSYMBOL_PROG2,
+    /*     */ cFUNC | EF.cSYMBOL_INPUT,
+    /*     */ cFUNC | EF.cSYMBOL_PROG2,
+    /*         */ cFUNC | EF.cSYMBOL_SET_1,
+    /*             */ cCNST | 1u,
+    /*         */ cCOND | EC.cSYMBOL_IF_HAS_ATTACHED,
+    /*             */ cFUNC | EF.cSYMBOL_TRAVERSE,
+    /*             */ cFUNC | EF.cSYMBOL_NOOP
+  };
+}
+
+/**
+   Storing a sequence into memory.
+   The program assumes we're initially attached to the last item for simplicity.
+
+   (prog2
+     (input)
+     (if-attached
+       (prog2
+         (prog2 ; store current item
+           (memory-prev)
+           (selected-to-memory))
+         (prog2
+           (set-1
+             (quote 1)) ; prev. item bond index
+           (if-has-attached
+             (traverse) ; move to prev. item
+             (detach)   ; no prev. item, detach from input sequence
+           )))
+       (noop) ; no input
+     ))
+
+ */
+transient ExecTestCopyData : ExecTestSequenceData {
+  constant Size cSIZE = 14u;
+
+  Item data[cSIZE] = {
+    /* */ cFUNC | EF.cSYMBOL_PROG2,
+    /*     */ cFUNC | EF.cSYMBOL_INPUT,
+    /*     */ cCOND | EC.cSYMBOL_IF_ATTACHED,
+    /*         */ cFUNC | EF.cSYMBOL_PROG2,
+    /*             */ cFUNC | EF.cSYMBOL_PROG2,
+    /*                 */ cFUNC | EF.cSYMBOL_MEMORY_PREV,
+    /*                 */ cFUNC | EF.cSYMBOL_SELECTED_TO_MEMORY,
+    /*             */ cFUNC | EF.cSYMBOL_PROG2,
+    /*                 */ cFUNC | EF.cSYMBOL_SET_1,
+    /*                     */ cCNST | 1u,
+    /*                 */ cCOND | EC.cSYMBOL_IF_HAS_ATTACHED,
+    /*                     */ cFUNC | EF.cSYMBOL_TRAVERSE,
+    /*                     */ cFUNC | EF.cSYMBOL_DETACH,
+    /*         */ cFUNC | EF.cSYMBOL_NOOP
   };
 }
