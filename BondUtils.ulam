@@ -18,10 +18,8 @@ quark BondUtils + Fail {
   EventWindow ew;
 
   // TODO:
-  // * DRY;
   // * make last "new bond index" arguments optional instead of object site:
   //   passing zero for self is easier;
-  // * Use status checking functions
 
   IBondable& getBondable(SiteNum site) {
     checkIsBondable(site);
@@ -53,6 +51,13 @@ quark BondUtils + Fail {
     return replace(0u, index, subSite, subIndex, bondIndex);
   }
 
+  /**
+     Replace a bondable atom attached to bondable at `site` with another atom.
+
+     `site`, `index` site and index of an atom whose attachment we are replacing
+     `subSite`, `subIndex` site and index of substitute
+     `bondIndex` a bond index to attach the substitute to
+   */
   Status replace(SiteNum site, Index index, SiteNum subSite, Index subIndex, Index bondIndex) {
     if (!ew.isAccessible(site) || !ew.isAccessible(subSite))
       return cSTATUS_INACCESSIBLE;
@@ -92,39 +97,45 @@ quark BondUtils + Fail {
   }
 
 
-  Status transfer(Index index, SiteNum toSite, Index toIndex) {
-    return transfer(0u, index, toSite, toIndex);
+  Status transfer(Index index, SiteNum toSite, Index toIndex, Index bondIndex) {
+    return transfer(0u, index, toSite, toIndex, bondIndex);
   }
 
-  // UNTESTED
-  Status transfer(SiteNum site, Index index, SiteNum toSite, Index toIndex) {
-    if (!ew.isAccessible(site) || !ew.isAccessible(toSite))
+
+  /**
+     Tranfer a bondable atom between arbitrary bondables.
+
+     `fromSite`, `fromIndex` site and index of first bondable
+     `toSite`, `toIndex` site and index of second bondable
+     `bondIndex` atom bond index used to attach to second bondable
+   */
+  Status transfer(SiteNum fromSite, Index fromIndex, SiteNum toSite, Index toIndex, Index bondIndex) {
+    if (!ew.isAccessible(fromSite) || !ew.isAccessible(toSite))
       return cSTATUS_INACCESSIBLE;
 
-    checkIsBondable(toSite);
+    IBondable& from = getBondable(fromSite);
+    IBondable& to = getBondable(toSite);
 
-    // Get bond
-    IBondable& obj = getBondable(site);
-    QBond& bond = obj.getBond(index);
-    if (!bond.isBonded())
-      return cSTATUS_NOT_BONDED; // or just attach anyway?
+    QBond& fromBond = from.getBond(fromIndex);
+    if (!fromBond.isBonded())
+      return cSTATUS_NOT_BONDED;
+    Index objIndex = fromBond.getIndex(); // store in case we need to re-atach
 
-    // Get attached atom
-    C2D fromCoord = ew.getCoordRaw(site) + bond.getCoord();
-    Index fromIndex = bond.getIndex(); // store in case we need to re-attach
-    if (!ew.isAccessible(fromCoord))
-      return cSTATUS_INACCESSIBLE;
-    IBondable& from = getBondable(ew.getSiteNumberRaw(fromCoord));
+    QBond& toBond = to.getBond(toIndex);
+    if (toBond.isBonded())
+      return cSTATUS_ALREADY_BONDED;
+
+    // Get object site
+    C2D objCoord = ew.getCoordRaw(fromSite) + fromBond.getCoord();
+    SiteNum objSite = ew.getSiteNumberRaw(objCoord);
 
     // Detach
-    if (!bond.breakup())
+    if (!fromBond.breakup(fromSite))
       return cSTATUS_CANNOT_DETACH;
 
     // Attach to target
-    if (!bond.bond(site, index, toSite, toIndex)) {
-      // Try to re-attach
-      SiteNum fromSite = ew.getSiteNumberRaw(fromCoord);
-      if (!bond.bond(site, index, fromSite, fromIndex)) {
+    if (!toBond.bond(toSite, toIndex, objSite, bondIndex)) {
+      if (!fromBond.bond(fromSite, fromIndex, objSite, objIndex)) {
         fail("BondUtils.transfer: failed to re-attach");
         return cSTATUS_CANNOT_REATTACH;
       }
@@ -139,8 +150,15 @@ quark BondUtils + Fail {
   }
 
   /**
-     Detach bondable from currently attached and re-attach to next item
-     in a sequence. All three atoms must be accessible (at least) to succeed.
+     Detach bondable atom from currently attached and re-attach to next item
+     in a sequence (of any bondable atoms, not just Sequence).
+
+     All three atoms must be accessible (at least) to succeed.
+
+     `site` atom site
+     `index` index of a bond that has attached sequence item
+     `indexNext` index of a bond of sequence item, attached to the next one
+     `indexBond` atom bond index used to attach to next item
    */
   Status traverse(SiteNum site, Index index, Index indexNext, Index indexBond) {
     if (!ew.isAccessible(site))
