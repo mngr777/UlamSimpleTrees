@@ -1,6 +1,7 @@
 quark DataUtils {
   typedef Bits(16) Datum;
   typedef Bits(8) Byte;
+  typedef Int(8) Integer;
 
   Datum makeDatum(Byte hi, Byte lo) {
     return (Datum)((Datum) hi << 8 | lo);
@@ -40,6 +41,18 @@ quark DataUtils {
   Datum setLo(Datum datum, Byte value, Byte mask, Unsigned shift) {
     Byte lo = setToByte(getLo(datum), value, mask, shift);
     return setLo(datum, lo);
+  }
+
+
+  Integer toInteger(Byte value) {
+    Byte mask = 0x1 << (Byte.sizeof - 1);
+    return (Unsigned) (value & mask) > 0u
+      ? (Integer) -(((Integer) ~value) + 1)
+      : (Integer) value;
+  }
+
+  Byte fromInteger(Integer value) {
+    return (Byte) value;
   }
 
 

@@ -1,5 +1,5 @@
 /**
-   Dummy element matching file name to keep compiler happy 
+   Dummy element matching file name to keep compiler happy
 
    \placeable no
  */
@@ -120,42 +120,23 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
   }
 
   Datum getData(Size num) {
-    Item item = 0x0;
-
     if (cDEMO == 1u) {
       ExecTestRewindData data;
-      item = data.data[num];
+      return data.prepare(data.data[num]);
 
     } else if (cDEMO == 2u) {
       ExecTestCopyData data;
-      item = data.data[num];
+      return data.prepare(data.data[num]);
 
     } else if (cDEMO == 3u) {
       ExecTreeBuildData data;
-      item = data.data[num];
+      return data.prepare(data.data[num]);
 
     } else {
       Fail fl;
       fl.fail("Invalid demo number");
+      return TreeData.cNODATA;
     }
-
-    return prepareSequenceData(item);
-  }
-
-  Datum prepareSequenceData(Item item) {
-    ExecTestSequenceData sd;
-    TreeData td;
-    TreeExec exec;
-
-    Type type = sd.getType(item);
-    Byte value = sd.getValue(item);
-    Arity arity = exec.getArity(type, (Symbol) value);
-
-    Datum datum = TreeData.cNODATA;
-    datum = td.setArity(datum, arity);
-    datum = td.setType(datum, type);
-    datum = td.setValue(datum, value);
-    return datum;
   }
 }
 
@@ -164,16 +145,22 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
    Setting up stage 2:
    - build a tree from the sequence;
    - attach the tree to a "general purpose" executor `TreeExec`;
-   - attach the sequence to the executor as input (reusing the original sequence for simplicity)
+   - attach a sequence to the executor as input
 
    \symbol EB
  */
 element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + QMortal + Fail {
   constant QBond.Index cEXEC = 2u;
 
-  constant State cSTATE_PLACING_EXEC = cSTATE_DONE_BUILDING; // alias
-  constant State cSTATE_ATTACHING_PROGRAM = cSTATE_FIRST_UNUSED;
+  constant State cSTATE_DETACHING_SEQUENCE = cSTATE_DONE_BUILDING; // alias
+  constant State cSTATE_BUILDING_SEQUENCE = cSTATE_FIRST_UNUSED;
+  constant State cSTATE_PLACING_EXEC = cSTATE_BUILDING_SEQUENCE + 1u;
+  constant State cSTATE_ATTACHING_PROGRAM = cSTATE_PLACING_EXEC + 1u;
   constant State cSTATE_DONE = cSTATE_ATTACHING_PROGRAM + 1u;
+
+  constant Bool cREUSE_INPUT_SEQUENCE = false;
+
+  Unsigned mCount = 0u;
 
   @Override IBondable& getBondable() {
     return self;
@@ -193,7 +180,13 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
   Void step() {
     self.QTreeBuilder.step();
 
-    if (getState() == cSTATE_PLACING_EXEC) {
+    if (getState() == cSTATE_DETACHING_SEQUENCE) {
+      detachSequence();
+
+    } else if (getState() == cSTATE_BUILDING_SEQUENCE) {
+      buildSequence();
+
+    } else if (getState() == cSTATE_PLACING_EXEC) {
       placeExecAndAttachSequence();
 
     } else if (getState() == cSTATE_ATTACHING_PROGRAM) {
@@ -201,13 +194,65 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
     }
   }
 
+  /**
+     Attach a mover to the input sequence to drag it away.
+     Or do nothing if reusing the sequence.
+   */
+  Void detachSequence() {
+    if (cREUSE_INPUT_SEQUENCE) {
+      // Reusing input sequence as input to executor
+      setState(cSTATE_PLACING_EXEC);
+    };
+
+    BondUtils bu;
+    EventWindow ew;
+    EventWindowMisc ewm;
+
+    DebugUtils du;
+    du.print("detaching sequence");
+
+    QBond& seqBond = getBond(cSEQUENCE);
+    SiteNum site = ewm.findEmptySiteAround(seqBond.getCoord(), 1u, QBond.cMAX_DIST);
+    if (site == SiteNum.maxof)
+      return;
+
+    Mover mover;
+    ew[site] = mover;
+
+    // Replace ourselves with mover
+    SiteNum seqSite = seqBond.getSiteNumber();
+    BondUtils.Status status = bu.replace(seqSite, Sequence.cCOMMON, site, Mover.cCOMMON, Sequence.cCOMMON);
+    if (!bu.isOk(status)) {
+      // cleanup
+      Empty empty;
+      ew[site] = empty;
+      return;
+    }
+
+    setState(cSTATE_BUILDING_SEQUENCE);
+  }
+
+  /**
+     Grow test sequence in place of detached input sequence.
+   */
+  Void buildSequence() {
+    if (mCount >= ExecTestShortData.cSIZE) {
+      setState(cSTATE_PLACING_EXEC);
+      return;
+    }
+
+    ExecTestShortData data;
+    SequenceBuilder builder;
+    DataUtils.Datum datum = data.prepare(data.data[mCount]);
+    if (builder.buildNext(self, datum, cSEQUENCE))
+      mCount++;
+  }
+
   Void placeExecAndAttachSequence() {
     BondUtils bu;
     DebugUtils du;
     EventWindow ew;
     EventWindowMisc ewm;
-
-    du.print("placing executor");
 
     QBond& seqBond = getBond(cSEQUENCE);
     SiteNum site = ewm.findEmptySiteAround(seqBond.getSiteNumber(), 1u, QBond.cMAX_DIST);
@@ -227,7 +272,6 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
       ew[site] = empty;
       return;
     }
-
 
     // transfer input sequence to exec.
     du.print("transferring input sequence to executor");
@@ -276,11 +320,16 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
 
 
 transient ExecTestSequenceData {
+  typedef DataUtils.Datum Datum;
   typedef DataUtils.Byte Byte;
+
   typedef TreeData.Type Type;
+  typedef TreeData.Symbol Symbol;
+  typedef TreeData.Arity Arity;
+
   typedef Bits(Type.sizeof + Byte.sizeof) Item;
 
-  typedef Unsigned(6) Size;
+  typedef Unsigned(8) Size;
 
   constant Item cFUNC = TreeData.cTYPE_FUNCTION << Byte.sizeof;
   constant Item cCOND = TreeData.cTYPE_CONDITIONAL << Byte.sizeof;
@@ -301,11 +350,47 @@ transient ExecTestSequenceData {
   Byte getValue(Item item) {
     return (Byte) item;
   }
+
+  Datum prepare(Item item) {
+    TreeData td;
+    TreeExec exec;
+
+    Type type = getType(item);
+    Byte value = getValue(item);
+    Arity arity = exec.getArity(type, (Symbol) value);
+
+    Datum datum = TreeData.cNODATA;
+    datum = td.setArity(datum, arity);
+    datum = td.setType(datum, type);
+    datum = td.setValue(datum, value);
+    return datum;
+  }
 }
 
 
 local typedef TreeExecFunctions EF;
 local typedef TreeExecConditionals EC;
+
+/**
+   Very short test sequence
+
+   (prog2
+     (prog2
+       (noop)
+       (noop))
+     (noop))
+ */
+transient ExecTestShortData : ExecTestSequenceData {
+  constant Size cSIZE = 5u;
+
+  Item data[cSIZE] = {
+    /* */ cFUNC | EF.cPROG2,
+    /*     */ cFUNC | EF.cPROG2,
+    /*         */ cFUNC | EF.cNOOP,
+    /*         */ cFUNC | EF.cNOOP,
+    /*     */ cFUNC | EF.cNOOP
+  };
+}
 
 /**
   Moving to the beginning of input sequence.
@@ -380,108 +465,170 @@ transient ExecTestCopyData : ExecTestSequenceData {
 /**
    Building a tree from sequence.
 
-    1  (prog2
-    2    (output)
-    3    (if-attached
-    4      (prog2 ;; already started building
-    5        (prog2 ;; is node complete?
-    6          (arity)
-    7          (sub
-    8            (num-attached))) ; arity - (# of children)
-    9        (if-zero
-    10         (prog2 ;; done, move up
-    11           (set-1
-    12             (quote 1)) ; parent bond index
-    13           (traverse)) ;; (we trust that the sequence is correct and there is a parent node)
-    14         (prog2 ;; build next child and traverse to it
-    15           (prog2
-    16             (prog2
-    17               (prog2
-    18                 (selected-to-memory)
-    19                 (inc)) ; bond index to attach next child: arity - (# of children) + 1
-    20               (set-2
-    21                 (quote 1))) ; child to parent bond index
-    22             (prog2
-    23               (build-next)
-    24               (traverse)))
-    25           (prog2
-    26             (prog2
-    27               (input)
-    28               (set-1
-    29                 (quote 2))) ; next item bond index
-    30             (if-has-attached
-    31               (traverse)    ; move to next item
-    32               (detach)))))) ; done
-    33     (prog2   ;; no output, haven't started building yet, keep rewinding
-    34       (prog2 ;; is there a prev. item?
-    35         (input)
-    36         (set-1
-    37           (quote 1))) ; prev. item bond index
-    38       (if-has-attached
-    39         (traverse)
-    40         (prog2   ;; beginning of sequence, build root node
-    41           (prog2
-    42             (selected-to-memory)
-    43             (build))
-    44           (prog2
-    45             (set-1
-    46               (quote 2)) ; next item bond index
-    47             (if-has-attached
-    48               (traverse)      ; move to next
-    49               (detach)))))))) ; done, root is the only node
+    1   (if-input-attached
+    2     (if-output-attached
+    3       (prog2
+    4         (prog2
+    5           (prog2
+    6             (output)
+                  (prog2
+                    (set-1
+                      1)
+    7               (set-2
+    8                 (-
+                        (num-attached)
+                        (if-has-attached
+                          1
+                          0))))
+    9           (prog2
+    10            (output)
+    11            (set-1 ; (arity + 1) - (# of children + 1) ; one "child" is `TreeExec` itself
+    12              (-
+    13                (+
+    14                  1
+    15                  (arity))
+    16                (get-2)))))
+    17        (if-zero
+    18          (prog2 ;; Done, move to parent
+    19            (set-1
+    20              1)
+    21            (prog2
+    22              (output)
+    23              (traverse)))
+    24           (prog2 ;; Build next child and traverse to it
+    25             (prog2
+    26               (prog2
+    27                 (input)
+    28                 (selected-to-memory))
+    29               (prog2
+    30                 (prog2
+    31                   (set-1 ; arity - (# of children) - 2, is it zero?
+    32                     (-
+    33                       (get-1)
+    34                       2))
+    35                   (if-zero
+    36                     (set-1
+    37                       2)   ; left child bond
+    38                     (set-1
+    39                       3))) ; right child bond
+    40                 (prog2
+    41                   (prog2
+    42                     (set-2
+    43                       1) ; parent bond
+    44                     (build-next))
+    45                   (prog2
+    46                     (output)
+    47                     (traverse)))))
+    48            (prog2 ;; Move to next input
+    49              (prog2
+    50                (input)
+    51                (set-1
+    52                  2)) ; next bond
+    53              (if-has-attached
+    54                (traverse)
+    55                (detach)))))) ; done, detach input
+    56      (prog2
+    57        (set-1
+    58          1) ; prev bond
+    59        (if-input-has-attached
+    60          (traverse)
+    61          (prog2
+    62            (prog2
+    63              (prog2
+    64                (input)
+    65                (selected-to-memory))
+    66              (build))
+    67            (prog2
+    68              (set-1
+    69                2)
+    70              (if-has-attached
+    71                (traverse)
+    72                (detach))))))) ; done, detach input
+    73    (noop)) ; no input
 */
 transient ExecTreeBuildData : ExecTestSequenceData {
-  constant Size cSIZE = 49u;
+  constant Size cSIZE = 80u;
 
   Item data[cSIZE] = {
-    /* 1 */ cFUNC | EF.cPROG2,
-    /* 2     */ cFUNC | EF.cOUTPUT,
-    /* 3     */ cCOND | EC.cIF_ATTACHED,
-    /* 4         */ cFUNC | EF.cPROG2,
-    /* 5             */ cFUNC | EF.cPROG2,
-    /* 6                 */ cFUNC | EF.cARITY,
-    /* 7                 */ cFUNC | EF.cSUB,
-    /* 8                     */ cFUNC | EF.cNUM_ATTACHED,
-    /* 9             */ cCOND | EC.cIF_ZERO,
-    /* 10                */ cFUNC | EF.cPROG2,
-    /* 11                    */ cFUNC | EF.cSET_1,
-    /* 12                        */ cCNST | (Byte) 1u,
-    /* 13                    */ cFUNC | EF.cTRAVERSE,
-    /* 14                */ cFUNC | EF.cPROG2,
-    /* 15                    */ cFUNC | EF.cPROG2,
-    /* 16                        */ cFUNC | EF.cPROG2,
-    /* 17                             */ cFUNC | EF.cPROG2,
-    /* 18                                 */ cFUNC | EF.cSELECTED_TO_MEMORY,
-    /* 19                                 */ cFUNC | EF.cINC,
-    /* 20                             */ cFUNC | EF.cSET_2,
-    /* 21                                 */ cCNST | (Byte) 1u,
-    /* 22                        */ cFUNC | EF.cPROG2,
-    /* 23                            */ cFUNC | EF.cBUILD_NEXT,
-    /* 24                            */ cFUNC | EF.cTRAVERSE,
-    /* 25                    */ cFUNC | EF.cPROG2,
-    /* 26                        */ cFUNC | EF.cPROG2,
-    /* 27                            */ cFUNC | EF.cINPUT,
-    /* 28                            */ cFUNC | EF.cSET_1,
-    /* 29                                */ cCNST | (Byte) 2u,
-    /* 30                        */ cCOND | EC.cIF_HAS_ATTACHED,
-    /* 31                            */ cFUNC | EF.cTRAVERSE,
-    /* 32                            */ cFUNC | EF.cDETACH,
-    /* 33        */ cFUNC | EF.cPROG2,
-    /* 34            */ cFUNC | EF.cPROG2,
-    /* 35                */ cFUNC | EF.cINPUT,
-    /* 36                */ cFUNC | EF.cSET_1,
-    /* 37                    */ cCNST | (Byte) 1u,
-    /* 38            */ cCOND | EC.cIF_HAS_ATTACHED,
-    /* 39                */ cFUNC | EF.cTRAVERSE,
-    /* 40                */ cFUNC | EF.cPROG2,
-    /* 41                    */ cFUNC | EF.cPROG2,
-    /* 42                        */ cFUNC | EF.cSELECTED_TO_MEMORY,
-    /* 43                        */ cFUNC | EF.cBUILD,
-    /* 44                    */ cFUNC | EF.cPROG2,
-    /* 45                        */ cFUNC | EF.cSET_1,
-    /* 46                            */ cCNST | (Byte) 2u,
-    /* 47                        */ cCOND | EC.cIF_HAS_ATTACHED,
-    /* 48                            */ cFUNC | EF.cTRAVERSE,
-    /* 49                            */ cFUNC | EF.cDETACH
+    /*  1 */ cCOND | EC.cIF_INPUT_ATTACHED,
+    /*  2     */ cCOND | EC.cIF_OUTPUT_ATTACHED,
+    /*  3         */ cFUNC | EF.cPROG2,
+    /*  4             */ cFUNC | EF.cPROG2,
+    /*  5                 */ cFUNC | EF.cPROG2,
+    /*  6                     */ cFUNC | EF.cOUTPUT,
+    /*                        */ cFUNC | EF.cPROG2,
+    /*                            */ cFUNC | EF.cSET_1,
+    /*                                */ cCNST | (Byte) 1u,
+    /*  7                         */ cFUNC | EF.cSET_2,
+    /*  8                             */ cFUNC | EF.cSUB,
+    /*                                    */ cFUNC | EF.cNUM_ATTACHED,
+    /*                                    */ cCOND | EC.cIF_HAS_ATTACHED,
+    /*                                        */ cCNST | (Byte) 1u,
+    /*                                        */ cCNST | (Byte) 0u,
+    /*  9                 */ cFUNC | EF.cPROG2,
+    /* 10                     */ cFUNC | EF.cOUTPUT,
+    /* 11                     */ cFUNC | EF.cSET_1,
+    /* 12                         */ cFUNC | EF.cSUB,
+    /* 13                             */ cFUNC | EF.cADD,
+    /* 14                                 */ cCNST | (Byte) 1u,
+    /* 15                                 */ cFUNC | EF.cARITY,
+    /* 16                             */ cFUNC | EF.cGET_2,
+    /* 17             */ cCOND | EC.cIF_ZERO,
+    /* 18                 */ cFUNC | EF.cPROG2,
+    /* 19                     */ cFUNC | EF.cSET_1,
+    /* 20                         */ cCNST | (Byte) 1u,
+    /* 21                     */ cFUNC | EF.cPROG2,
+    /* 22                         */ cFUNC | EF.cOUTPUT,
+    /* 23                         */ cFUNC | EF.cTRAVERSE,
+    /* 24                    */ cFUNC | EF.cPROG2,
+    /* 25                        */ cFUNC | EF.cPROG2,
+    /* 26                            */ cFUNC | EF.cPROG2,
+    /* 27                                */ cFUNC | EF.cINPUT,
+    /* 28                                */ cFUNC | EF.cSELECTED_TO_MEMORY,
+    /* 29                            */ cFUNC | EF.cPROG2,
+    /* 30                                */ cFUNC | EF.cPROG2,
+    /* 31                                    */ cFUNC | EF.cSET_1,
+    /* 32                                        */ cFUNC | EF.cSUB,
+    /* 33                                            */ cFUNC | EF.cGET_1,
+    /* 34                                            */ cCNST | (Byte) 2u,
+    /* 35                                    */ cCOND | EC.cIF_ZERO,
+    /* 36                                        */ cFUNC | EF.cSET_1,
+    /* 37                                            */ cCNST | (Byte) 2u,
+    /* 38                                        */ cFUNC | EF.cSET_1,
+    /* 39                                            */ cCNST | (Byte) 3u,
+    /* 40                                */ cFUNC | EF.cPROG2,
+    /* 41                                    */ cFUNC | EF.cPROG2,
+    /* 42                                        */ cFUNC | EF.cSET_2,
+    /* 43                                            */ cCNST | (Byte) 1u,
+    /* 44                                        */ cFUNC | EF.cBUILD_NEXT,
+    /* 45                                    */ cFUNC | EF.cPROG2,
+    /* 46                                        */ cFUNC | EF.cOUTPUT,
+    /* 47                                        */ cFUNC | EF.cTRAVERSE,
+    /* 48                     */ cFUNC | EF.cPROG2,
+    /* 49                         */ cFUNC | EF.cPROG2,
+    /* 50                             */ cFUNC | EF.cINPUT,
+    /* 51                             */ cFUNC | EF.cSET_1,
+    /* 52                                 */ cCNST | (Byte) 2u,
+    /* 53                         */ cCOND | EC.cIF_HAS_ATTACHED,
+    /* 54                             */ cFUNC | EF.cTRAVERSE,
+    /* 55                             */ cFUNC | EF.cDETACH,
+    /* 56         */ cFUNC | EF.cPROG2,
+    /* 57             */ cFUNC | EF.cSET_1,
+    /* 58                 */ cCNST | (Byte) 1u,
+    /* 59             */ cCOND | EC.cIF_INPUT_HAS_ATTACHED,
+    /* 60                 */ cFUNC | EF.cTRAVERSE,
+    /* 61                 */ cFUNC | EF.cPROG2,
+    /* 62                     */ cFUNC | EF.cPROG2,
+    /* 63                         */ cFUNC | EF.cPROG2,
+    /* 64                             */ cFUNC | EF.cINPUT,
+    /* 65                             */ cFUNC | EF.cSELECTED_TO_MEMORY,
+    /* 66                         */ cFUNC | EF.cBUILD,
+    /* 67                     */ cFUNC | EF.cPROG2,
+    /* 68                         */ cFUNC | EF.cSET_1,
+    /* 69                             */ cCNST | (Byte) 2u,
+    /* 70                         */ cCOND | EC.cIF_HAS_ATTACHED,
+    /* 71                             */ cFUNC | EF.cTRAVERSE,
+    /* 72                             */ cFUNC | EF.cDETACH,
+    /* 73     */ cFUNC | EF.cNOOP
   };
 }

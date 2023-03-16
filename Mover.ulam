@@ -6,7 +6,7 @@ element Mover: QBondableT(1u) {
 
   constant QBond.Index cCOMMON = 0u;
 
-  Dir mDir = 6u; // west
+  Dir mDir = 5u; // northwest
 
   Void setDir(C2D.Dir dir) {
     mDir = dir;
@@ -16,8 +16,8 @@ element Mover: QBondableT(1u) {
     EventWindow ew;
     SwapHelper sh;
     C2D coord;
-    for (Unsigned i = 0u; i < 3u; i++) {
-      coord = coord.neighbor(mDir);
+    C2D step = coord.neighbor(mDir);
+    for (coord = step; coord.length() <= 4u; coord += step) {
       if (sh.swap(0u, ew.getSiteNumber(coord)))
         return;
     }

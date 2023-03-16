@@ -1,12 +1,12 @@
-quark TreeData {
+transient TreeData {
   typedef DataUtils.Datum Datum;
   typedef DataUtils.Byte Byte;
+  typedef DataUtils.Integer Integer;
 
   typedef Unsigned(2) Arity;
   typedef Unsigned(2) Type;
 
   typedef Byte Symbol;
-  typedef Int(8) Integer;
 
   constant Datum cNODATA = 0x0;
   constant Byte cNIL = 0x0;
@@ -16,7 +16,7 @@ quark TreeData {
   constant Type cTYPE_CONSTANT = 2u;
 
   // Data
-  // arity  type unused     symbol/constant/state ref/...
+  // arity  type unused     symbol/value
   //   v     v     v          v
   // | 0 1 | 2 3 | 4 5 6 | 7 | 0 1 2 3 4 5 6 7
   //                       ^
@@ -104,10 +104,10 @@ quark TreeData {
   }
 
   Integer getInteger(Datum datum) {
-    return (Integer) getValue(datum);
+    return dd.toInteger(getValue(datum));
   }
 
   Datum setInteger(Datum datum, Integer value) {
-      return setValue(datum, (Byte) value);
+    return setValue(datum, dd.fromInteger(value));
   }
 }
