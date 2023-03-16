@@ -606,7 +606,8 @@ element TreeExec : QBondableT(4u) + QDiffusableT(1000u) + QMortal {
   Sequence& getMemory() {
     EventWindow ew;
     SiteNum site = getBond(cMEMORY).getSiteNumber();
-    return (Sequence&) ew[site];
+    Sequence& seq = (Sequence&) ew[site];
+    return seq;
   }
 
   Bool createMemoryNext(QBond.Index index) {
@@ -680,7 +681,8 @@ transient TreeExecImpl + Fail {
   DataUtils dd;
 
   IBondable& getSelectedBondable(TreeExec& exec) {
-    return (IBondable&) getSelectedAtom(exec);
+    IBondable& bondable = (IBondable&) getSelectedAtom(exec);
+    return bondable;
   }
 
   Bool hasSelected(TreeExec& exec) {

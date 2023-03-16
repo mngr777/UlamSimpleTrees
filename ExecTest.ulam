@@ -1,3 +1,5 @@
+use IBondable;
+
 /**
    Dummy element matching file name to keep compiler happy
 
@@ -342,7 +344,8 @@ transient ExecTestSequenceData {
   typedef TreeData.Symbol Symbol;
   typedef TreeData.Arity Arity;
 
-  typedef Bits(Type.sizeof + Byte.sizeof) Item;
+  // typedef Bits(Type.sizeof + Byte.sizeof) Item;
+  typedef Bits(10) Item;
 
   typedef Unsigned(8) Size;
 

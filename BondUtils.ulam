@@ -23,7 +23,8 @@ quark BondUtils + Fail {
 
   IBondable& getBondable(SiteNum site) {
     checkIsBondable(site);
-    return (IBondable&) ew[site];
+    IBondable& bondable = (IBondable&) ew[site];
+    return bondable;
   }
 
   Void checkIsBondable(SiteNum site) {
