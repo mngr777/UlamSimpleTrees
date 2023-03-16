@@ -11,8 +11,8 @@ quark SwapHelper {
     Atom& atom1 = ew[site1];
     Atom& atom2 = ew[site2];
 
-    if ((atom1 is IBondable) && (atom2 is IBondable))
-      return false; // TEST
+    // if ((atom1 is IBondable) && (atom2 is IBondable))
+    //   return false; // TEST
 
     // Check if bonds allow for swapping
     if (atom1 as IBondable) {
