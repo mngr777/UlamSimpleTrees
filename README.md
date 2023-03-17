@@ -76,6 +76,19 @@ There's an option to reuse the program sequence as input: select "EP" element in
 ### The interpreter
 The interpreter has 4 bonds: for program tree, memory sequence, input sequence and output tree. There's also state number, two "registers" and and index of currently selected bond. The output is a tree just because I wanted to have a demo with building a copy of the program that the builder itself is running (see below); trees and sequences should be replaced with a single type anyway.
 
+Functions that are not supposed to fail like `+` or `-` can have their arguments directly passed to them like `(+ 1 2)`. Functions that create new atoms and manipulate links instead read their arguments from registers and memory and expect input or output bond to be selected, e.g. moving to next atom in input sequence look like this:
+```
+(prog2
+  (prog2
+    (input)        ; select input
+    (set-1 2))     ; set register 1 value to bond index of next atom
+  (if-has-attached ; is there anything attached to "next" bond?
+    (traverse)     ; move
+    (noop)))
+```
+Here `traverse` puts `TreeExec` into `cSTATE_TRAVERSE` state until it succeeds or fails and goes into
+`cSTATE_EXEC` or `cSTATE_FAIL`. This is not designed very well and not lispy at all but works for the demos so I'm leaving it as is.
+
 ### Moving to the beginning of input sequence
 `TreeExec` is attached to the last atom in a sequence and crawls to the beginning
 

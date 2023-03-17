@@ -1,0 +1,13 @@
+/**
+   \symbol DP
+   \color #00f
+ */
+element DemoParameters {
+
+  /**
+     Complete diffusability value
+
+     \range 1000..10000
+   */
+  parameter Unsigned pCOMPLETE_DIFFUSABILITY = 1000u;
+}

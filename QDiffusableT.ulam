@@ -3,7 +3,7 @@ local typedef EventWindow.SiteNum SiteNum;
 quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radius cDIFFUSION_RADIUS = 4u): IDiffusable {
 
   // constant Diffusability cCOMPLETE_DIFFUSABILITY = 10000u;
-  constant Diffusability cCOMPLETE_DIFFUSABILITY = 1000u;
+  // constant Diffusability cCOMPLETE_DIFFUSABILITY = 1000u;
 
   @Override Diffusability getDiffusability() {
     return cDIFFUSABILITY;
@@ -44,10 +44,15 @@ quark QDiffusableT(IDiffusable.Diffusability cDIFFUSABILITY, WindowServices.Radi
         }
       }
     }
-    if (d > 0u && random.oddsOf(d, cCOMPLETE_DIFFUSABILITY)) {
+    if (d > 0u && random.oddsOf(d, getCompleteDiffusability())) {
       SwapHelper sh;
       sh.swap(0, site);
     }
+  }
+
+  Unsigned getCompleteDiffusability() {
+    DemoParameters params;
+    return params.pCOMPLETE_DIFFUSABILITY;
   }
 
   SiteNum getDiffusionSite() {
