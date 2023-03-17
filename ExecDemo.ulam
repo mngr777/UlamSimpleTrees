@@ -1,17 +1,17 @@
-use IBondable;
+use IBondable; // for ulam <=5.0.7
 
 /**
    Dummy element matching file name to keep compiler happy
 
    \placeable no
  */
-element ExecTest {}
+element ExecDemo {}
 
 /**
    \symbol EP
    \color #00f
  */
-element ExecTestParameters {
+element ExecDemoParameters {
   /**
      Reuse `TreeExec`'s program sequence as it's input
    */
@@ -22,7 +22,7 @@ element ExecTestParameters {
    \symbol E1
    \color #00f
  */
-element ExecDemo1_RewindSequence : QExecTest(1u) + QBondableT(1u) {
+element ExecDemo1_RewindSequence : QExecDemo(1u) + QBondableT(1u) {
   @Override Void behave() {
     if (buildNext(self) && attachTreeBuilder(self))
       die();
@@ -33,7 +33,7 @@ element ExecDemo1_RewindSequence : QExecTest(1u) + QBondableT(1u) {
    \symbol E2
    \color #00f
  */
-element ExecDemo2_CopySequenceToMemory : QExecTest(2u) + QBondableT(1u) {
+element ExecDemo2_CopySequenceToMemory : QExecDemo(2u) + QBondableT(1u) {
   @Override Void behave() {
     if (buildNext(self) && attachTreeBuilder(self))
       die();
@@ -44,7 +44,7 @@ element ExecDemo2_CopySequenceToMemory : QExecTest(2u) + QBondableT(1u) {
    \symbol E3
    \color #00f
  */
-element ExecDemo3_TreeFromSequence : QExecTest(3u) + QBondableT(1u) {
+element ExecDemo3_TreeFromSequence : QExecDemo(3u) + QBondableT(1u) {
   @Override Void behave() {
     if (buildNext(self) && attachTreeBuilder(self))
       die();
@@ -54,9 +54,9 @@ element ExecDemo3_TreeFromSequence : QExecTest(3u) + QBondableT(1u) {
 /**
    Shared demo code, stage 1:
    - build selected sequence;
-   - attach `ExecTestTreeBuilder` to set up stage 2
+   - attach `ExecDemoTreeBuilder` to set up stage 2
  */
-quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
+quark QExecDemo(Unsigned cDEMO = 1u) + QMortal + Fail {
   typedef EventWindow.SiteNum SiteNum;
 
   typedef DataUtils.Byte Byte;
@@ -65,8 +65,8 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
   typedef TreeData.Type Type;
   typedef TreeData.Arity Arity;
 
-  typedef ExecTestSequenceData.Size Size;
-  typedef ExecTestSequenceData.Item Item;
+  typedef ExecDemoSequenceData.Size Size;
+  typedef ExecDemoSequenceData.Item Item;
 
   constant QBond.Index cOUTPUT= 0u;
 
@@ -92,7 +92,7 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
     if (site == SiteNum.maxof)
       return false;
 
-    ExecTestTreeBuilder builder;
+    ExecDemoTreeBuilder builder;
     ew[site] = builder;
 
     IBondable& bondable = (IBondable&) demo;
@@ -100,7 +100,7 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
     SiteNum seqSite = seqBond.getSiteNumber();
 
     // Replace demo with the builder
-    BondUtils.Status status = bu.replace(seqSite, seqBond.getIndex(), site, ExecTestTreeBuilder.cSEQUENCE, Sequence.cCOMMON);
+    BondUtils.Status status = bu.replace(seqSite, seqBond.getIndex(), site, ExecDemoTreeBuilder.cSEQUENCE, Sequence.cCOMMON);
     if (bu.isError(status)) {
       Fail fl;
       fl.fail("Failed to replace with builder");
@@ -117,10 +117,10 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
 
   Size getDataSize() {
     if (cDEMO == 1u) {
-      return ExecTestRewindData.cSIZE;
+      return ExecDemoRewindData.cSIZE;
 
     } else if (cDEMO == 2u) {
-      return ExecTestCopyData.cSIZE;
+      return ExecDemoCopyData.cSIZE;
 
     } else if (cDEMO == 3u) {
       return ExecTreeBuildData.cSIZE;
@@ -134,11 +134,11 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
 
   Datum getData(Size num) {
     if (cDEMO == 1u) {
-      ExecTestRewindData data;
+      ExecDemoRewindData data;
       return data.prepare(data.data[num]);
 
     } else if (cDEMO == 2u) {
-      ExecTestCopyData data;
+      ExecDemoCopyData data;
       return data.prepare(data.data[num]);
 
     } else if (cDEMO == 3u) {
@@ -163,7 +163,7 @@ quark QExecTest(Unsigned cDEMO = 1u) + QMortal + Fail {
 
    \symbol EB
  */
-element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + QMortal + Fail {
+element ExecDemoTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + QMortal + Fail {
   constant QBond.Index cEXEC = 2u;
 
   constant State cSTATE_DETACHING_SEQUENCE = cSTATE_DONE_BUILDING; // alias
@@ -213,7 +213,7 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
   Void detachSequence() {
     DebugUtils du;
 
-    ExecTestParameters params;
+    ExecDemoParameters params;
     if (params.pREUSE_SEQUENCE) {
       du.print("Reusing program sequence as input");
       setState(cSTATE_PLACING_EXEC);
@@ -254,13 +254,13 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
   Void buildSequence() {
     DebugUtils du;
 
-    if (mCount >= ExecTestShortData.cSIZE) {
+    if (mCount >= ExecDemoShortData.cSIZE) {
       du.print("Input sequences ready");
       setState(cSTATE_PLACING_EXEC);
       return;
     }
 
-    ExecTestShortData data;
+    ExecDemoShortData data;
     SequenceBuilder builder;
     DataUtils.Datum datum = data.prepare(data.data[mCount]);
     if (builder.buildNext(self, datum, cSEQUENCE))
@@ -296,7 +296,7 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
     du.print("Transferring input sequence to executor");
     BondUtils.Status status = bu.transfer(0u, cSEQUENCE, site, TreeExec.cINPUT, Sequence.cCOMMON);
     if (bu.isError(status)) {
-      fail("ExecTestTreeBuilder.placeExecAndAttachSequence: failed to transfer input sequence to executor");
+      fail("ExecDemoTreeBuilder.placeExecAndAttachSequence: failed to transfer input sequence to executor");
       return;
 
     } else if (!bu.isOk(status)) {
@@ -322,7 +322,7 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
     // Transfer the tree to the executor
     BondUtils.Status status = bu.transfer(0u, cTREE, execSite, TreeExec.cPROGRAM, Tree.cCOMMON);
     if (bu.isError(status)) {
-      fail("ExecTestTreeBuilder.attachProgram: failed to transfer program tree to executor");
+      fail("ExecDemoTreeBuilder.attachProgram: failed to transfer program tree to executor");
       return;
 
     } else if (bu.isOk(status)) {
@@ -336,7 +336,7 @@ element ExecTestTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u
 }
 
 
-transient ExecTestSequenceData {
+transient ExecDemoSequenceData {
   typedef DataUtils.Datum Datum;
   typedef DataUtils.Byte Byte;
 
@@ -398,7 +398,7 @@ local typedef TreeExecConditionals EC;
        (noop))
      (noop))
  */
-transient ExecTestShortData : ExecTestSequenceData {
+transient ExecDemoShortData : ExecDemoSequenceData {
   constant Size cSIZE = 5u;
 
   Item data[cSIZE] = {
@@ -422,7 +422,7 @@ transient ExecTestShortData : ExecTestSequenceData {
         (traverse) ; move to prev. item
         (noop)))))
 */
-transient ExecTestRewindData : ExecTestSequenceData {
+transient ExecDemoRewindData : ExecDemoSequenceData {
   constant Size cSIZE = 8u;
 
   Item data[cSIZE] = {
@@ -459,7 +459,7 @@ transient ExecTestRewindData : ExecTestSequenceData {
      ))
 
  */
-transient ExecTestCopyData : ExecTestSequenceData {
+transient ExecDemoCopyData : ExecDemoSequenceData {
   constant Size cSIZE = 14u;
 
   Item data[cSIZE] = {
@@ -562,7 +562,7 @@ transient ExecTestCopyData : ExecTestSequenceData {
     77                (detach))))))) ; done, detach input
     78    (noop)) ; no input
 */
-transient ExecTreeBuildData : ExecTestSequenceData {
+transient ExecTreeBuildData : ExecDemoSequenceData {
   constant Size cSIZE = 78u;
 
   Item data[cSIZE] = {

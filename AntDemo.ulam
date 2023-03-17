@@ -2,10 +2,10 @@
    Sets up an artificial ant to follow the Santa Fe trail
    (see https://en.wikipedia.org/wiki/Santa_Fe_Trail_problem)
 
-   \symbol AT
+   \symbol AD
    \color #00f
  */
-element AntTest : QBondableT(1u) + QMortal {
+element AntDemo : QBondableT(1u) + QMortal {
   typedef TreeData.Datum Datum;
   typedef TreeData.Symbol Symbol;
   typedef TreeData.Type Type;
@@ -160,7 +160,7 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + Q
       return;
 
     // Start building the trail
-    AntTestTrailBuilder builder;
+    AntDemoTrailBuilder builder;
     ew[startCoord] = builder;
 
     setState(cSTATE_PLACING_ANT);
@@ -202,7 +202,7 @@ element AntTreeBuilder : QTreeBuilder + QBondableT(3u) + QDiffusableT(1000u) + Q
    \symbol AP
    \color #f30
  */
-element AntTestTrailBuilder : QMortal {
+element AntDemoTrailBuilder : QMortal {
   typedef AntTrailData.Move Move;
   typedef C2D.Dir Dir;
 

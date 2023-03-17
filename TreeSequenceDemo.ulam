@@ -1,10 +1,10 @@
 local typedef DataUtils.Datum Datum;
 
 /**
-   \symbol TS
-   \color #0ff
+   \symbol TP
+   \color #00f
  */
-element TreeSequenceTestParameters {
+element TreeSequenceDemoParameters {
   /**
      Attach TreeBuilder to sequence.
    */
@@ -16,7 +16,7 @@ element TreeSequenceTestParameters {
    \color #00f
    \symmetry all
  */
-element TreeSequenceTest : QBondableT(1u) + QMortal {
+element TreeSequenceDemo : QBondableT(1u) + QMortal {
   typedef TreeData.Arity Arity;
 
   constant Unsigned cLENGTH = 7;
@@ -37,7 +37,7 @@ element TreeSequenceTest : QBondableT(1u) + QMortal {
       if (buildNextItem())
         mCounter++;
     } else if (mCounter == cLENGTH) {
-      TreeSequenceTestParameters params;
+      TreeSequenceDemoParameters params;
       if (!params.pATTACH_BUILDER || buildTreeBuilder())
         die(); // done
     }
