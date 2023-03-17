@@ -101,4 +101,4 @@ Here `traverse` puts `TreeExec` into `cSTATE_TRAVERSE` state until it succeeds o
 
 
 ### Building a tree (E3 element)
-`TreeExec` gets a program that implements mostly the same algorith as `TreeBuilder` and runs it on input sequence. 
+`TreeExec` gets a program that implements mostly the same algorithm as `TreeBuilder` and runs it on input sequence. 
