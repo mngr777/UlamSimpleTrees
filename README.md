@@ -96,8 +96,7 @@ Here `traverse` puts `TreeExec` into `cSTATE_TRAVERSE` state until it succeeds o
 
 ### Moving to the beginning of input sequence (E1 element)
 `TreeExec` (white `TE` atom) is attached to the last atom in a sequence and crawls to the beginning. Program tree: [ExecDemo.ulam:416](https://github.com/mngr777/UlamSimpleTrees/blob/71290ee7ed5fb6046185bf887ed8ca035ae11ee7/ExecDemo.ulam#L416)
-
-![rewind](https://user-images.githubusercontent.com/1970037/225989313-f2a4a19e-f539-4b8d-b7df-8ddeb75a4c69.png)
+![rewind-last](https://user-images.githubusercontent.com/1970037/226033015-d22504db-862a-44c5-9899-a9eb4afcb677.png) ![rewind-middle](https://user-images.githubusercontent.com/1970037/226030409-92f031bc-0272-424d-8d3d-82863d540be0.png)
 
 
 ### Storing a copy of input sequence in memory (E2 element)
@@ -107,4 +106,11 @@ Program tree: [ExecDemo.ulam:444](https://github.com/mngr777/UlamSimpleTrees/blo
 
 
 ### Building a tree (E3 element)
-`TreeExec` gets a program that implements mostly the same algorithm as `TreeBuilder` and runs it on input sequence. 
+`TreeExec` gets a program that implements mostly the same algorithm as `TreeBuilder` and runs it on input sequence. Program: [ExecDemo.ulam:486](https://github.com/mngr777/UlamSimpleTrees/blob/3c029cb939154290f75354d2252ce2f8511b7665/ExecDemo.ulam#L486)
+
+Here's a picture of `TreeExec` in the beginning of building a tree from a sequence containing it's own program:
+
+![building-tree](https://user-images.githubusercontent.com/1970037/226048972-d5380cf6-a411-4dee-a0bc-b211bf2c41c7.png)
+
+
+
