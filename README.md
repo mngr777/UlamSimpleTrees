@@ -95,9 +95,15 @@ Here `traverse` puts `TreeExec` into `cSTATE_TRAVERSE` state until it succeeds o
 `cSTATE_EXEC` or `cSTATE_FAIL`. This is not designed very well and not lispy at all but works for the demos so I'm leaving it as is.
 
 ### Moving to the beginning of input sequence (E1 element)
-`TreeExec` is attached to the last atom in a sequence and crawls to the beginning
+`TreeExec` (white `TE` atom) is attached to the last atom in a sequence and crawls to the beginning. Program tree: [ExecDemo.ulam:416](https://github.com/mngr777/UlamSimpleTrees/blob/71290ee7ed5fb6046185bf887ed8ca035ae11ee7/ExecDemo.ulam#L416)
+
+![rewind](https://user-images.githubusercontent.com/1970037/225989313-f2a4a19e-f539-4b8d-b7df-8ddeb75a4c69.png)
+
 
 ### Storing a copy of input sequence in memory (E2 element)
+Program tree: [ExecDemo.ulam:444](https://github.com/mngr777/UlamSimpleTrees/blob/71290ee7ed5fb6046185bf887ed8ca035ae11ee7/ExecDemo.ulam#L444)
+
+![memory](https://user-images.githubusercontent.com/1970037/225993551-6af718db-0828-4264-bd9b-7de2ada78894.png)
 
 
 ### Building a tree (E3 element)
