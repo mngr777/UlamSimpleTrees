@@ -58,10 +58,10 @@ Moves (diffusable) stuff it's attached to. It is used in demos to drag away inpu
 
 # Demos
 
-### Sequence to Tree
+### Sequence to Tree (TS element)
 `TreeBuilder` object produces a tree from a sequence it's attached to.
 
-### Ant
+### Ant (AD element)
 A program tree is constructed and used to drive an "artificial ant" agent. `Ant` element has an interpreter for a simple language that consists of `if-food-ahead` conditional and functions `forward`, `left`, `right` and `progn` to glue them together.
 
 
@@ -79,7 +79,7 @@ The following three demos feature a "general purpose" interpreter `TreeExec`. Th
 There's an option to reuse the program sequence as input: select "EP" element in "Tools" and check parameter box.
 
 ### The interpreter
-The interpreter has 4 bonds: for program tree, memory sequence, input sequence and output tree. There's also state number, two "registers" and and index of currently selected bond. The output is a tree just because I wanted to have a demo with building a copy of the program that the builder itself is running (see below); trees and sequences should be replaced with a single type anyway.
+The `TreeExec` interpreter has 4 bonds: for program tree, memory sequence, input sequence and output tree. There's also state number, two "registers" and and index of currently selected bond. The output is a tree just because I wanted to have a demo with building a copy of the program that the builder itself is running (see below); trees and sequences should be replaced with a single type anyway.
 
 Functions that are not supposed to fail like `+` or `-` can have their arguments directly passed to them like `(+ 1 2)`. Functions that create new atoms and manipulate links instead read their arguments from registers and memory and expect input or output bond to be selected, e.g. moving to next atom in input sequence look like this:
 ```
@@ -94,11 +94,11 @@ Functions that are not supposed to fail like `+` or `-` can have their arguments
 Here `traverse` puts `TreeExec` into `cSTATE_TRAVERSE` state until it succeeds or fails and goes into
 `cSTATE_EXEC` or `cSTATE_FAIL`. This is not designed very well and not lispy at all but works for the demos so I'm leaving it as is.
 
-### Moving to the beginning of input sequence
+### Moving to the beginning of input sequence (E1 element)
 `TreeExec` is attached to the last atom in a sequence and crawls to the beginning
 
-### Storing a copy of input sequence in memory
+### Storing a copy of input sequence in memory (E2 element)
 
 
-### Building a tree
+### Building a tree (E3 element)
 `TreeExec` gets a program that implements mostly the same algorith as `TreeBuilder` and runs it on input sequence. 
