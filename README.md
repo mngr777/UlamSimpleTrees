@@ -1,3 +1,5 @@
+![ant](https://user-images.githubusercontent.com/1970037/225900641-fa48f082-9cda-40fe-a545-be0ae0a2d5f8.png)
+
 A collection of demos for Moveable Feast Machine.
 The demos show executing programs represented as trees of bonded atoms.
 
@@ -15,11 +17,16 @@ Half a link between two atoms. Stores a site number of other atom (at default ev
 An interface and implementation (template) for a container of `QBond` objects. This allows elements to have a different number of bonds.
 
 ## Sequence and Tree
+![sequence](https://user-images.githubusercontent.com/1970037/225901913-fbb812df-693d-4140-ae6a-c47b088aa7c9.png)
+![tree](https://user-images.githubusercontent.com/1970037/225901934-b817c0dc-f4e1-4899-a732-15ed90178c65.png)
+
 Simple data containers that can be bonded together. The data is `Datum` type that combines data and metadata in a single `Bits(16)` value. `Tree` element additionally has a second field to hold a result of subtree evaluation. Both elements have an additional bond so that they can be attached to an atom using them.
 
 There's actually no need to have two different types, this is just a bit simpler to implement.
 
 ## TreeBuilder and QTreeBuilder
+![tree-builder](https://user-images.githubusercontent.com/1970037/225903165-1e3d222f-2dbb-4ca7-a399-fe4ea73a4a28.png)
+
 A state machine for building trees from sequences is implemented in `QTreeBuilder` quark, so builders extending it can have additional states and functionality -- this is used to set up the demos.
 
 ## IDiffusable and QDiffusableT
@@ -44,6 +51,8 @@ Swaps two atoms using `EventWindow.swap`. Checks the bonds before swapping and u
 Builds a sequence while keeping it attached to a bondable atom, simulating input.
 
 ## Mover
+![mover](https://user-images.githubusercontent.com/1970037/225904224-e2feebbd-bf3e-4214-8746-88c37e439f1e.png)
+
 Moves (diffusable) stuff it's attached to. It is used in demos to drag away input sequences that are no longer used.
 
 
