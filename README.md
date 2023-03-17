@@ -17,8 +17,9 @@ Half a link between two atoms. Stores a site number of other atom (at default ev
 An interface and implementation (template) for a container of `QBond` objects. This allows elements to have a different number of bonds.
 
 ## Sequence and Tree
-![sequence](https://user-images.githubusercontent.com/1970037/225901913-fbb812df-693d-4140-ae6a-c47b088aa7c9.png)
-![tree](https://user-images.githubusercontent.com/1970037/225901934-b817c0dc-f4e1-4899-a732-15ed90178c65.png)
+![sequence](https://user-images.githubusercontent.com/1970037/226056347-dda3892c-c464-4c90-b1dd-328bf005e9cd.png)
+![tree](https://user-images.githubusercontent.com/1970037/226056371-4862d47a-a0bb-4415-a97a-19bbb64cb59d.png)
+
 
 Simple data containers that can be bonded together. The data is `Datum` type that combines data and metadata in a single `Bits(16)` value. `Tree` element additionally has a second field to hold a result of subtree evaluation. Both elements have an additional bond so that they can be attached to an atom using them.
 
