@@ -64,6 +64,11 @@ Moves (diffusable) stuff it's attached to. It is used in demos to drag away inpu
 ### Ant
 A program tree is constructed and used to drive an "artificial ant" agent. `Ant` element has an interpreter for a simple language that consists of `if-food-ahead` conditional and functions `forward`, `left`, `right` and `progn` to glue them together.
 
+
+https://user-images.githubusercontent.com/1970037/225955700-d0e9890f-a50f-4881-bba6-b5ae76b6e5ed.mp4
+
+
+
 ## Demos using "general purpose" interpreter
 The following three demos feature a "general purpose" interpreter `TreeExec`. They all are set up in a same way:
 * Demo element builds a sequence containing a program for `TreeExec` to execute.
