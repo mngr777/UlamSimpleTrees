@@ -7,6 +7,7 @@ TLDR:
 * Programs are represented as binary trees built from bonded atoms.
 * Program trees are executed by an interpreter atom crawling between nodes along the bonds.
 * Trees are constructed from sequences that represent input to the system.
+* Here's a [video](#ant-ad-element) of an artificial and following a trail by executing a program tree.
 
 # Classes
 
