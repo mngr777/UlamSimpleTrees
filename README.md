@@ -9,6 +9,12 @@ TLDR:
 * Trees are constructed from sequences that represent input to the system.
 * Here's a [video](#ant-ad-element) of an artificial and following a trail by executing a program tree.
 
+# Building and running
+On Ubuntu, intstall `ulam` package (it contains both ULAM and MFM) from PPA, see [ULAM Tutorial](https://github.com/elenasa/ULAM/wiki/Ulam-Programming-Language).  
+Or install ULAM and MFM from source: http://robust.cs.unm.edu/doku.php?id=dev:install_ulam. Note that for `develop` branch, `Makefile.local.mk` should use `$ULAM_ROOT_DIR` instead of `$ROOT_DIR`.
+
+After that, running `make` in repo directory will compile `*.ulam` source files and run the result in MFM.
+
 # Classes
 
 ## QBond
