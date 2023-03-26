@@ -7,7 +7,7 @@ TLDR:
 * Programs are represented as binary trees built from bonded atoms.
 * Program trees are executed by an interpreter atom crawling between nodes along the bonds.
 * Trees are constructed from sequences that represent input to the system.
-* Here's a [video](#ant-ad-element) of an artificial and following a trail by executing a program tree. Full [5 min. run on YouTube](https://www.youtube.com/watch?v=1OOWWHmasfc).
+* Here's a [video](#ant-ad-element) of an artificial antuf following a trail by executing a program tree. Full [5 min. run on YouTube](https://www.youtube.com/watch?v=1OOWWHmasfc).
 
 # Building and running
 On Ubuntu, intstall `ulam` package (it contains both ULAM and MFM) from PPA, see [ULAM Tutorial](https://github.com/elenasa/ULAM/wiki/Ulam-Programming-Language).  
@@ -100,7 +100,7 @@ Functions that are not supposed to fail like `+` or `-` can have their arguments
     (noop)))
 ```
 Here `traverse` puts `TreeExec` into `cSTATE_TRAVERSE` state until it succeeds or fails and goes into
-`cSTATE_EXEC` or `cSTATE_FAIL`. This is not designed very well and not lispy at all but works for the demos so I'm leaving it as is.
+`cSTATE_EXEC` or `cSTATE_ERROR`. This is not designed very well and not lispy at all but works for the demos so I'm leaving it as is.
 
 ### Moving to the beginning of input sequence (E1 element)
 `TreeExec` (white `TE` atom) is attached to the last atom in a sequence and crawls to the beginning. Program tree: [ExecDemo.ulam:416](https://github.com/mngr777/UlamSimpleTrees/blob/71290ee7ed5fb6046185bf887ed8ca035ae11ee7/ExecDemo.ulam#L416)
