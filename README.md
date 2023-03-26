@@ -7,7 +7,7 @@ TLDR:
 * Programs are represented as binary trees built from bonded atoms.
 * Program trees are executed by an interpreter atom crawling between nodes along the bonds.
 * Trees are constructed from sequences that represent input to the system.
-* Here's a [video](#ant-ad-element) of an artificial antuf following a trail by executing a program tree. Full [5 min. run on YouTube](https://www.youtube.com/watch?v=1OOWWHmasfc).
+* Here's a [video](#ant-ad-element) of an artificial ant following a trail by executing a program tree. Full [5 min. run on YouTube](https://www.youtube.com/watch?v=1OOWWHmasfc).
 
 # Building and running
 On Ubuntu, intstall `ulam` package (it contains both ULAM and MFM) from PPA, see [ULAM Tutorial](https://github.com/elenasa/ULAM/wiki/Ulam-Programming-Language).  
